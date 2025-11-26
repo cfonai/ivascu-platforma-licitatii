@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+@layer components {
+  .btn-gradient {
+    @apply px-6 py-2.5 rounded-lg font-medium text-white transition-all duration-200 hover:shadow-lg active:scale-95;
+  }
+
+  .btn-gradient-primary {
+    @apply bg-gradient-primary;
+  }
+
+  .btn-gradient-success {
+    @apply bg-gradient-success;
+  }
+
+  .btn-gradient-warning {
+    @apply bg-gradient-warning;
+  }
+
+  .btn-gradient-danger {
+    @apply bg-gradient-danger;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+
+  .status-badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+}
