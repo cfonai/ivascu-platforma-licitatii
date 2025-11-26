@@ -178,7 +178,13 @@ export default function RFQDetailPage() {
     setIsSubmittingNegotiation(true);
 
     try {
-      await api.post(`/negotiations/${negotiationId}/respond`, { ...responseForm, acceptFinal });
+      // Use default message if empty
+      const messageToSend = responseForm.message || (acceptFinal ? 'Acceptat' : 'Răspuns');
+      await api.post(`/negotiations/${negotiationId}/respond`, {
+        ...responseForm,
+        message: messageToSend,
+        acceptFinal
+      });
       setResponseForm({ message: '', proposedPrice: undefined, proposedDeliveryTime: '', acceptFinal: false });
       fetchOffers();
       fetchRFQ();
@@ -227,8 +233,12 @@ export default function RFQDetailPage() {
         return 'bg-yellow-100 text-yellow-700';
       case 'in_negotiation':
         return 'bg-purple-100 text-purple-700';
+      case 'final_confirmed':
+        return 'bg-green-200 text-green-800';
       case 'accepted':
         return 'bg-green-100 text-green-700';
+      case 'rejected':
+        return 'bg-red-100 text-red-700';
       default:
         return 'bg-gray-100 text-gray-700';
     }
@@ -248,8 +258,12 @@ export default function RFQDetailPage() {
         return 'În revizuire';
       case 'in_negotiation':
         return 'Negociere';
+      case 'final_confirmed':
+        return 'Ofertă finală confirmată';
       case 'accepted':
         return 'Acceptată';
+      case 'rejected':
+        return 'Respinsă';
       default:
         return status;
     }
@@ -643,11 +657,78 @@ export default function RFQDetailPage() {
                               </div>
                             )}
 
-                          {/* Max rounds reached */}
-                          {negotiations.get(offer.id)?.status === 'active' &&
+                          {/* Max rounds reached - Supplier final decision */}
+                          {user?.role === 'supplier' &&
+                            offer.supplierId === user?.id &&
+                            negotiations.get(offer.id)?.status === 'active' &&
+                            (negotiations.get(offer.id)?.rounds || 0) >= 3 && (
+                              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                                <p className="text-yellow-800 font-semibold mb-3">
+                                  Numărul maxim de runde de negociere a fost atins. Decideți dacă acceptați sau respingeți oferta finală.
+                                </p>
+                                {negotiationError && (
+                                  <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-sm mb-3">
+                                    {negotiationError}
+                                  </div>
+                                )}
+                                <div className="space-y-3">
+                                  <textarea
+                                    value={responseForm.message}
+                                    onChange={(e) => setResponseForm({ ...responseForm, message: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                                    rows={2}
+                                    placeholder="Mesaj final (opțional)..."
+                                  />
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleRespondNegotiation(negotiations.get(offer.id)!.id, true)}
+                                      disabled={isSubmittingNegotiation}
+                                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm disabled:opacity-50"
+                                    >
+                                      {isSubmittingNegotiation ? 'Se trimite...' : '✓ Acceptă oferta finală'}
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        console.log('Reject button clicked');
+                                        const confirmed = window.confirm('Sigur doriți să respingeți această ofertă? Această acțiune nu poate fi anulată.');
+                                        console.log('Confirmation result:', confirmed);
+                                        if (confirmed) {
+                                          setIsSubmittingNegotiation(true);
+                                          setNegotiationError('');
+                                          try {
+                                            console.log('Calling reject API...');
+                                            await api.post(`/negotiations/${negotiations.get(offer.id)!.id}/reject`, {
+                                              message: responseForm.message || 'Oferta a fost respinsă',
+                                            });
+                                            console.log('Reject successful');
+                                            setResponseForm({ message: '', proposedPrice: undefined, proposedDeliveryTime: '', acceptFinal: false });
+                                            fetchOffers();
+                                            fetchRFQ();
+                                          } catch (error) {
+                                            console.error('Reject error:', error);
+                                            const apiError = error as ApiError;
+                                            setNegotiationError(apiError.error || 'Eroare la respingerea ofertei');
+                                          } finally {
+                                            setIsSubmittingNegotiation(false);
+                                          }
+                                        }
+                                      }}
+                                      disabled={isSubmittingNegotiation}
+                                      className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm disabled:opacity-50"
+                                    >
+                                      ✗ Respinge oferta
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                          {/* Max rounds reached - Admin/Client view */}
+                          {(user?.role === 'admin' || user?.role === 'client') &&
+                            negotiations.get(offer.id)?.status === 'active' &&
                             (negotiations.get(offer.id)?.rounds || 0) >= 3 && (
                               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-3 py-2 rounded-lg text-sm">
-                                Numărul maxim de runde de negociere a fost atins.
+                                Numărul maxim de runde de negociere a fost atins. Se așteaptă decizia finală a furnizorului.
                               </div>
                             )}
                         </div>

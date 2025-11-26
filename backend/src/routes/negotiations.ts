@@ -15,7 +15,7 @@ const initiateNegotiationSchema = z.object({
 });
 
 const respondNegotiationSchema = z.object({
-  message: z.string().min(10),
+  message: z.string().min(1),  // Allow short messages for accept/reject
   proposedPrice: z.number().positive().optional(),
   proposedDeliveryTime: z.string().optional(),
   acceptFinal: z.boolean().optional(),
@@ -67,7 +67,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
       data: {
         offerId,
         rfqId: offer.rfqId,
-        adminId: req.user.id,
+        adminId: req.user.userId,
         supplierId: offer.supplierId,
         rounds: 1,
         status: 'active',
@@ -78,7 +78,7 @@ router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
     await prisma.negotiationMessage.create({
       data: {
         negotiationId: negotiation.id,
-        senderId: req.user.id,
+        senderId: req.user.userId,
         senderRole: 'admin',
         roundNumber: 1,
         message,
@@ -139,8 +139,8 @@ router.get('/:id', authenticateToken, async (req: AuthRequest, res: Response) =>
 
     // Check authorization
     const isAdmin = req.user?.role === 'admin';
-    const isSupplier = req.user?.id === negotiation.supplierId;
-    const isClient = req.user?.id === negotiation.rfq.clientId;
+    const isSupplier = req.user?.userId === negotiation.supplierId;
+    const isClient = req.user?.userId === negotiation.rfq.clientId;
 
     if (!isAdmin && !isSupplier && !isClient) {
       return res.status(403).json({ error: 'Nu aveți permisiunea să vedeți această negociere' });
@@ -186,8 +186,8 @@ router.get('/offer/:offerId', authenticateToken, async (req: AuthRequest, res: R
 
     // Check authorization
     const isAdmin = req.user?.role === 'admin';
-    const isSupplier = req.user?.id === negotiation.supplierId;
-    const isClient = req.user?.id === negotiation.rfq.clientId;
+    const isSupplier = req.user?.userId === negotiation.supplierId;
+    const isClient = req.user?.userId === negotiation.rfq.clientId;
 
     if (!isAdmin && !isSupplier && !isClient) {
       return res.status(403).json({ error: 'Nu aveți permisiunea să vedeți această negociere' });
@@ -226,7 +226,7 @@ router.post('/:id/respond', authenticateToken, async (req: AuthRequest, res: Res
       return res.status(404).json({ error: 'Negocierea nu a fost găsită' });
     }
 
-    if (negotiation.supplierId !== req.user.id) {
+    if (negotiation.supplierId !== req.user.userId) {
       return res.status(403).json({ error: 'Nu aveți permisiunea să răspundeți la această negociere' });
     }
 
@@ -234,7 +234,8 @@ router.post('/:id/respond', authenticateToken, async (req: AuthRequest, res: Res
       return res.status(400).json({ error: 'Negocierea nu mai este activă' });
     }
 
-    if (negotiation.rounds >= 3) {
+    // Check rounds limit only if NOT accepting final offer
+    if (!acceptFinal && negotiation.rounds >= 3) {
       return res.status(400).json({ error: 'Numărul maxim de runde a fost atins' });
     }
 
@@ -242,7 +243,7 @@ router.post('/:id/respond', authenticateToken, async (req: AuthRequest, res: Res
     await prisma.negotiationMessage.create({
       data: {
         negotiationId: id,
-        senderId: req.user.id,
+        senderId: req.user.userId,
         senderRole: 'supplier',
         roundNumber: negotiation.rounds,
         message,
@@ -327,7 +328,7 @@ router.post('/:id/admin-respond', authenticateToken, async (req: AuthRequest, re
     await prisma.negotiationMessage.create({
       data: {
         negotiationId: id,
-        senderId: req.user.id,
+        senderId: req.user.userId,
         senderRole: 'admin',
         roundNumber: negotiation.rounds + 1,
         message,
@@ -387,6 +388,68 @@ router.patch('/:id/cancel', authenticateToken, async (req: AuthRequest, res: Res
   } catch (error) {
     console.error('Error cancelling negotiation:', error);
     res.status(500).json({ error: 'Eroare la anularea negocierii' });
+  }
+});
+
+// POST /api/negotiations/:id/reject - Supplier rejects final offer
+router.post('/:id/reject', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'supplier') {
+      return res.status(403).json({ error: 'Doar furnizorii pot respinge oferte' });
+    }
+
+    const { id } = req.params;
+    const { message } = req.body;
+
+    const negotiation = await prisma.negotiation.findUnique({
+      where: { id },
+      include: { offer: true },
+    });
+
+    if (!negotiation) {
+      return res.status(404).json({ error: 'Negocierea nu a fost găsită' });
+    }
+
+    if (negotiation.supplierId !== req.user.userId) {
+      return res.status(403).json({ error: 'Nu aveți permisiunea să respingeți această ofertă' });
+    }
+
+    if (negotiation.status !== 'active') {
+      return res.status(400).json({ error: 'Negocierea nu mai este activă' });
+    }
+
+    // Create rejection message
+    if (message) {
+      await prisma.negotiationMessage.create({
+        data: {
+          negotiationId: id,
+          senderId: req.user.userId,
+          senderRole: 'supplier',
+          roundNumber: negotiation.rounds,
+          message,
+        },
+      });
+    }
+
+    // Cancel negotiation
+    await prisma.negotiation.update({
+      where: { id },
+      data: {
+        status: 'cancelled',
+        completedAt: new Date(),
+      },
+    });
+
+    // Mark offer as rejected
+    await prisma.offer.update({
+      where: { id: negotiation.offerId },
+      data: { status: 'rejected' },
+    });
+
+    res.json({ message: 'Oferta a fost respinsă' });
+  } catch (error) {
+    console.error('Error rejecting offer:', error);
+    res.status(500).json({ error: 'Eroare la respingerea ofertei' });
   }
 });
 
