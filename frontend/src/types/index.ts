@@ -79,6 +79,55 @@ export interface CreateOfferData {
   terms: string;
 }
 
+// Negotiation types
+export type NegotiationStatus = 'active' | 'completed' | 'cancelled';
+
+export interface NegotiationMessage {
+  id: string;
+  negotiationId: string;
+  senderId: string;
+  senderRole: 'admin' | 'supplier';
+  roundNumber: number;
+  message: string;
+  proposedPrice?: number;
+  proposedDeliveryTime?: string;
+  createdAt: string;
+  sender?: User;
+}
+
+export interface Negotiation {
+  id: string;
+  offerId: string;
+  rfqId: string;
+  adminId: string;
+  supplierId: string;
+  rounds: number;
+  status: NegotiationStatus;
+  createdAt: string;
+  completedAt?: string;
+  messages?: NegotiationMessage[];
+  offer?: Offer;
+  rfq?: {
+    id: string;
+    title: string;
+    clientId: string;
+  };
+}
+
+export interface InitiateNegotiationData {
+  offerId: string;
+  message: string;
+  proposedPrice?: number;
+  proposedDeliveryTime?: string;
+}
+
+export interface RespondNegotiationData {
+  message: string;
+  proposedPrice?: number;
+  proposedDeliveryTime?: string;
+  acceptFinal?: boolean;
+}
+
 // API Response types
 export interface ApiError {
   error: string;

@@ -6,6 +6,7 @@ import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import rfqRoutes from './routes/rfqs';
 import offerRoutes from './routes/offers';
+import negotiationRoutes from './routes/negotiations';
 
 dotenv.config();
 
@@ -52,6 +53,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rfqs', rfqRoutes);
 app.use('/api/offers', offerRoutes);
+app.use('/api/negotiations', negotiationRoutes);
 
 // Start server
 app.listen(PORT, () => {
