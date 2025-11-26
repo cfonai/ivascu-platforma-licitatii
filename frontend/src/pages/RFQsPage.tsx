@@ -205,7 +205,8 @@ export default function RFQsPage() {
                   {rfqs.map((rfq) => (
                     <div
                       key={rfq.id}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => navigate(`/rfqs/${rfq.id}`)}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
@@ -235,7 +236,10 @@ export default function RFQsPage() {
                         <div className="flex gap-2 ml-4">
                           {user?.role === 'admin' && rfq.status === 'draft' && (
                             <button
-                              onClick={() => handlePublishRFQ(rfq.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handlePublishRFQ(rfq.id);
+                              }}
                               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
                             >
                               Publică
@@ -244,7 +248,10 @@ export default function RFQsPage() {
                           {((user?.role === 'client' && rfq.clientId === user.id) || user?.role === 'admin') &&
                             rfq.status === 'draft' && (
                               <button
-                                onClick={() => setDeleteRFQId(rfq.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteRFQId(rfq.id);
+                                }}
                                 className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors text-sm"
                               >
                                 Șterge

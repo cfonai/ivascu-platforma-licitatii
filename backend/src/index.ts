@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
 import rfqRoutes from './routes/rfqs';
+import offerRoutes from './routes/offers';
 
 dotenv.config();
 
@@ -50,6 +51,7 @@ app.get('/api', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rfqs', rfqRoutes);
+app.use('/api/offers', offerRoutes);
 
 // Start server
 app.listen(PORT, () => {

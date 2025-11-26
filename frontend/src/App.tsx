@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/UsersPage';
 import RFQsPage from './pages/RFQsPage';
+import RFQDetailPage from './pages/RFQDetailPage';
 
 function App() {
   return (
@@ -36,6 +37,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <RFQsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/rfqs/:id"
+            element={
+              <ProtectedRoute>
+                <RFQDetailPage />
               </ProtectedRoute>
             }
           />

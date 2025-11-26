@@ -48,6 +48,37 @@ export interface CreateRFQData {
   budget?: number;
 }
 
+// Offer types
+export type OfferStatus = 'submitted' | 'under_review' | 'in_negotiation' | 'final_confirmed' | 'accepted' | 'rejected' | 'withdrawn';
+
+export interface Offer {
+  id: string;
+  rfqId: string;
+  supplierId: string;
+  price: number;
+  deliveryTime: string;
+  description: string;
+  terms: string;
+  status: OfferStatus;
+  isLocked: boolean;
+  submittedAt: string;
+  updatedAt: string;
+  supplier?: User;
+  rfq?: {
+    id: string;
+    title: string;
+    clientId?: string;
+  };
+}
+
+export interface CreateOfferData {
+  rfqId: string;
+  price: number;
+  deliveryTime: string;
+  description: string;
+  terms: string;
+}
+
 // API Response types
 export interface ApiError {
   error: string;
