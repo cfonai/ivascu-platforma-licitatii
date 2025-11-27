@@ -30,64 +30,50 @@ export default function OrderDetailPage() {
   };
 
   const handleUpdatePayment = async (status: 'initiated' | 'confirmed') => {
-    if (!window.confirm(`Confirmați actualizarea statusului plății la "${status === 'initiated' ? 'Inițiată' : 'Confirmată'}"?`)) {
-      return;
-    }
-
     try {
       await api.patch(`/orders/${id}/payment`, { status });
-      alert('Statusul plății a fost actualizat');
+      const message = status === 'initiated'
+        ? '✅ Plata a fost inițiată cu succes'
+        : '✅ Plata a fost confirmată cu succes';
+      alert(message);
       fetchOrder();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Eroare la actualizarea plății');
+      alert('❌ ' + (error.response?.data?.error || 'Eroare la actualizarea plății'));
     }
   };
 
   const handleUpdateDelivery = async (status: 'in_progress' | 'delivered' | 'received') => {
-    const statusNames = {
-      in_progress: 'În curs',
-      delivered: 'Livrată',
-      received: 'Primită'
-    };
-
-    if (!window.confirm(`Confirmați actualizarea statusului livrării la "${statusNames[status]}"?`)) {
-      return;
-    }
-
     try {
       await api.patch(`/orders/${id}/delivery`, { status });
-      alert('Statusul livrării a fost actualizat');
+      const statusMessages = {
+        in_progress: '✅ Livrarea a fost începută',
+        delivered: '✅ Comanda a fost marcată ca livrată',
+        received: '✅ Primirea comenzii a fost confirmată'
+      };
+      alert(statusMessages[status]);
       fetchOrder();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Eroare la actualizarea livrării');
+      alert('❌ ' + (error.response?.data?.error || 'Eroare la actualizarea livrării'));
     }
   };
 
   const handleFinalize = async () => {
-    if (!window.confirm('Confirmați finalizarea acestei comenzi? Această acțiune marchează comanda ca finalizată.')) {
-      return;
-    }
-
     try {
       await api.patch(`/orders/${id}/finalize`);
-      alert('Comanda a fost finalizată');
+      alert('✅ Comanda a fost finalizată cu succes');
       fetchOrder();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Eroare la finalizarea comenzii');
+      alert('❌ ' + (error.response?.data?.error || 'Eroare la finalizarea comenzii'));
     }
   };
 
   const handleArchive = async () => {
-    if (!window.confirm('Confirmați arhivarea acestei comenzi? Comanda va fi mutată în arhivă.')) {
-      return;
-    }
-
     try {
       await api.patch(`/orders/${id}/archive`);
-      alert('Comanda a fost arhivată');
+      alert('✅ Comanda a fost arhivată cu succes');
       fetchOrder();
     } catch (error: any) {
-      alert(error.response?.data?.error || 'Eroare la arhivarea comenzii');
+      alert('❌ ' + (error.response?.data?.error || 'Eroare la arhivarea comenzii'));
     }
   };
 

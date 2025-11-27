@@ -67,6 +67,9 @@ function App() {
             }
           />
 
+          {/* TODO: Future feature - Statistics pages for Admin, Client, and Supplier */}
+          {/* <Route path="/statistics" element={<ProtectedRoute><StatisticsPage /></ProtectedRoute>} /> */}
+
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
