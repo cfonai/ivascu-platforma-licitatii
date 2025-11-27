@@ -1,6 +1,7 @@
 export interface Supplier {
   id: string;
   name: string;
+  distance?: number;
   city: string;
   county: string;
   lat: number;
@@ -25,4 +26,5 @@ export interface SupplierStats {
   averageDistance: number;
   topReputationScore: number;
   averageSuccessRate: number;
+
 }
