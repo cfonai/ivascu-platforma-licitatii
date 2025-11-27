@@ -9,6 +9,7 @@ import RFQDetailPage from './pages/RFQDetailPage';
 import OrdersPage from './pages/OrdersPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import ArchivePage from './pages/ArchivePage';
+import SupplierMapPage from './features/SupplierMap/SupplierMapPage';
 
 function App() {
   return (
@@ -72,6 +73,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ArchivePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/supplier-map"
+            element={
+              <ProtectedRoute>
+                <SupplierMapPage />
               </ProtectedRoute>
             }
           />

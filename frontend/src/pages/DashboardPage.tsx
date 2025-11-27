@@ -118,6 +118,14 @@ export default function DashboardPage() {
             >
               Arhivă
             </button>
+            {user?.role === 'client' && (
+              <button
+                onClick={() => navigate('/supplier-map')}
+                className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+              >
+                Căutare Furnizor
+              </button>
+            )}
             {/* TODO: Future feature - Add Statistics navigation link */}
             {/* <button onClick={() => navigate('/statistics')} className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">Statistici</button> */}
           </nav>
