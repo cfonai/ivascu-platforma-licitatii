@@ -6,7 +6,7 @@ import { RFQ, Offer, CreateOfferData, ApiError, Negotiation, InitiateNegotiation
 
 export default function RFQDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const [rfq, setRFQ] = useState<RFQ | null>(null);
@@ -100,6 +100,11 @@ export default function RFQDetailPage() {
       fetchOffers();
     }
   }, [id, user]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
 
   // Submit offer (Supplier only)
   const handleSubmitOffer = async (e: React.FormEvent) => {
@@ -331,18 +336,15 @@ export default function RFQDetailPage() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="container mx-auto px-4 py-4">
           <div className="flex justify-between items-center mb-4">
-            <div>
-              <button
-                onClick={() => navigate('/rfqs')}
-                className="text-gray-600 hover:text-gray-900 mb-2 flex items-center gap-2"
-              >
-                ← Înapoi la cereri
-              </button>
-              <h1 className="text-2xl font-bold text-gray-900">{rfq.title}</h1>
-            </div>
-            <span className={`status-badge ${getStatusBadgeColor(rfq.status)}`}>
-              {getStatusName(rfq.status)}
-            </span>
+            <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              Platformă Licitații
+            </h1>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Deconectează-te
+            </button>
           </div>
 
           {/* Navigation */}
@@ -361,10 +363,7 @@ export default function RFQDetailPage() {
                 Utilizatori
               </button>
             )}
-            <button
-              onClick={() => navigate('/rfqs')}
-              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
-            >
+            <button className="px-4 py-2 text-primary-600 border-b-2 border-primary-600 font-medium">
               Cereri RFQ
             </button>
             <button
@@ -373,9 +372,35 @@ export default function RFQDetailPage() {
             >
               Comenzi
             </button>
+            <button
+              onClick={() => navigate('/archive')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Arhivă
+            </button>
           </nav>
         </div>
       </header>
+
+      {/* Sub-header with RFQ title */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <button
+                onClick={() => navigate('/rfqs')}
+                className="text-gray-600 hover:text-gray-900 mb-2 flex items-center gap-2"
+              >
+                ← Înapoi la cereri
+              </button>
+              <h2 className="text-xl font-bold text-gray-900">{rfq.title}</h2>
+            </div>
+            <span className={`status-badge ${getStatusBadgeColor(rfq.status)}`}>
+              {getStatusName(rfq.status)}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">

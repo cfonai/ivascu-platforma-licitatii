@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../lib/api';
 import { User, ApiError } from '../types';
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, logout } = useAuth();
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -96,6 +98,11 @@ export default function UsersPage() {
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   if (currentUser?.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -110,18 +117,66 @@ export default function UsersPage() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Gestionare Utilizatori
-          </h1>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-gradient btn-gradient-primary"
-          >
-            + Crează Utilizator
-          </button>
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              Platformă Licitații
+            </h1>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Deconectează-te
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex gap-4">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Dashboard
+            </button>
+            <button className="px-4 py-2 text-primary-600 border-b-2 border-primary-600 font-medium">
+              Utilizatori
+            </button>
+            <button
+              onClick={() => navigate('/rfqs')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Cereri RFQ
+            </button>
+            <button
+              onClick={() => navigate('/orders')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Comenzi
+            </button>
+            <button
+              onClick={() => navigate('/archive')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Arhivă
+            </button>
+          </nav>
         </div>
       </header>
+
+      {/* Sub-header for create button */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-4 py-3">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold text-gray-900">Gestionare Utilizatori</h2>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-gradient btn-gradient-primary"
+            >
+              + Crează Utilizator
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
