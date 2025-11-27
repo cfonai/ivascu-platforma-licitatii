@@ -128,6 +128,58 @@ export interface RespondNegotiationData {
   acceptFinal?: boolean;
 }
 
+// Order types
+export type OrderStatus =
+  | 'created'
+  | 'payment_initiated'
+  | 'payment_confirmed'
+  | 'delivery_in_progress'
+  | 'delivered'
+  | 'received'
+  | 'finalized'
+  | 'archived';
+
+export type PaymentMockStatus = 'pending' | 'initiated' | 'confirmed';
+export type DeliveryStatus = 'pending' | 'in_progress' | 'delivered' | 'received';
+
+export interface Order {
+  id: string;
+  rfqId: string;
+  offerId: string;
+  clientId: string;
+  supplierId: string;
+  finalPrice: number;
+  finalTerms: string;
+  status: OrderStatus;
+  isLocked: boolean;
+  paymentMockStatus: PaymentMockStatus;
+  deliveryStatus: DeliveryStatus;
+  createdAt: string;
+  finalizedAt?: string;
+  archivedAt?: string;
+  rfq?: {
+    id: string;
+    title: string;
+    description?: string;
+    requirements?: string;
+  };
+  offer?: Offer;
+  client?: User;
+  supplier?: User;
+}
+
+export interface CreateOrderData {
+  offerId: string;
+}
+
+export interface UpdatePaymentData {
+  status: 'initiated' | 'confirmed';
+}
+
+export interface UpdateDeliveryData {
+  status: 'in_progress' | 'delivered' | 'received';
+}
+
 // API Response types
 export interface ApiError {
   error: string;

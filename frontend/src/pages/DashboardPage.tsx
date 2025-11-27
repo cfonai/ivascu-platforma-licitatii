@@ -75,6 +75,12 @@ export default function DashboardPage() {
             >
               Cereri RFQ
             </button>
+            <button
+              onClick={() => navigate('/orders')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Comenzi
+            </button>
           </nav>
         </div>
       </header>

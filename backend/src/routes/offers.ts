@@ -285,4 +285,64 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * PATCH /api/offers/:id/reject
+ * Reject a final offer (Client only - for offers sent to client)
+ */
+router.patch('/:id/reject', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    // Get offer with RFQ
+    const offer = await prisma.offer.findUnique({
+      where: { id },
+      include: { rfq: true },
+    });
+
+    if (!offer) {
+      res.status(404).json({ error: 'Oferta nu a fost găsită' });
+      return;
+    }
+
+    // Check if client owns the RFQ
+    if (req.user!.role !== 'client' || offer.rfq.clientId !== req.user!.userId) {
+      res.status(403).json({ error: 'Nu aveți permisiunea să respingeți această ofertă' });
+      return;
+    }
+
+    // Check if offer is final_confirmed and RFQ is sent_to_client
+    if (offer.status !== 'final_confirmed') {
+      res.status(400).json({ error: 'Doar ofertele confirmate final pot fi respinse' });
+      return;
+    }
+
+    if (offer.rfq.status !== 'sent_to_client') {
+      res.status(400).json({ error: 'Oferta nu a fost trimisă spre aprobare' });
+      return;
+    }
+
+    // Reject offer
+    await prisma.offer.update({
+      where: { id },
+      data: {
+        status: 'rejected',
+      },
+    });
+
+    // Update RFQ status back to negotiation
+    await prisma.rFQ.update({
+      where: { id: offer.rfqId },
+      data: {
+        status: 'negotiation',
+      },
+    });
+
+    res.json({ message: 'Oferta a fost respinsă' });
+  } catch (error) {
+    console.error('Reject offer error:', error);
+    res.status(500).json({ error: 'Eroare la respingerea ofertei' });
+  }
+});
+
 export default router;

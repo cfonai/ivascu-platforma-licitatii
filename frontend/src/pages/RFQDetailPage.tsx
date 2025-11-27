@@ -219,6 +219,47 @@ export default function RFQDetailPage() {
     }
   };
 
+  // Send final offer to client (Admin only)
+  const handleSendToClient = async (offerId: string) => {
+    try {
+      await api.patch(`/rfqs/${id}/send-to-client`, { offerId });
+      alert('✅ Oferta finală a fost trimisă către client');
+      fetchOffers();
+      fetchRFQ();
+    } catch (error) {
+      console.error('Error sending to client:', error);
+      const apiError = error as ApiError;
+      alert('❌ ' + (apiError.error || 'Eroare la trimiterea ofertei către client'));
+    }
+  };
+
+  // Accept final offer - Create order (Client only)
+  const handleAcceptOffer = async (offerId: string) => {
+    try {
+      const response = await api.post('/orders', { offerId });
+      alert('✅ Comanda a fost creată cu succes!\n\nVeți fi redirecționat către pagina de comenzi.');
+      navigate('/orders');
+    } catch (error) {
+      console.error('Error creating order:', error);
+      const apiError = error as ApiError;
+      alert('❌ ' + (apiError.error || 'Eroare la crearea comenzii'));
+    }
+  };
+
+  // Reject final offer (Client only)
+  const handleRejectOffer = async (offerId: string) => {
+    try {
+      await api.patch(`/offers/${offerId}/reject`, { reason: 'Respinsă de client' });
+      alert('✅ Oferta a fost respinsă\n\nRFQ-ul va reveni la status de negociere.');
+      fetchOffers();
+      fetchRFQ();
+    } catch (error) {
+      console.error('Error rejecting offer:', error);
+      const apiError = error as ApiError;
+      alert('❌ ' + (apiError.error || 'Eroare la respingerea ofertei'));
+    }
+  };
+
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'draft':
@@ -325,6 +366,12 @@ export default function RFQDetailPage() {
               className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
             >
               Cereri RFQ
+            </button>
+            <button
+              onClick={() => navigate('/orders')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Comenzi
             </button>
           </nav>
         </div>
@@ -451,6 +498,19 @@ export default function RFQDetailPage() {
                               className="px-3 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm transition-colors"
                             >
                               Negociază
+                            </button>
+                          )}
+
+                        {/* Admin: Send to Client button */}
+                        {user?.role === 'admin' &&
+                          offer.status === 'final_confirmed' &&
+                          rfq?.status !== 'sent_to_client' &&
+                          rfq?.status !== 'closed' && (
+                            <button
+                              onClick={() => handleSendToClient(offer.id)}
+                              className="px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm transition-colors"
+                            >
+                              📤 Trimite către Client
                             </button>
                           )}
 
@@ -738,6 +798,72 @@ export default function RFQDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Client: Final Offer Approval Section */}
+          {user?.role === 'client' &&
+            rfq?.status === 'sent_to_client' &&
+            offers.some(o => o.status === 'final_confirmed') && (
+              <div className="card bg-blue-50 border-2 border-blue-400">
+                <h3 className="text-xl font-bold text-blue-900 mb-4">
+                  📬 Ofertă Finală Trimisă Spre Aprobare
+                </h3>
+                <p className="text-blue-800 mb-4">
+                  Administratorul a trimis oferta finală negociată pentru această cerere RFQ.
+                  Verificați detaliile și decideți dacă acceptați sau respingeți oferta.
+                </p>
+
+                {offers
+                  .filter(o => o.status === 'final_confirmed')
+                  .map(offer => (
+                    <div key={offer.id} className="bg-white rounded-lg p-5 border-2 border-green-400">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <p className="font-semibold text-gray-900 text-lg">
+                            Furnizor: {offer.supplier?.username}
+                          </p>
+                          <span className="status-badge bg-green-200 text-green-800 mt-2">
+                            Ofertă Finală Confirmată
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-green-700">
+                            {offer.price.toLocaleString('ro-RO')} RON
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            Livrare: {offer.deliveryTime}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 mb-4">
+                        <div>
+                          <span className="font-medium text-gray-700">Descriere:</span>
+                          <p className="text-gray-600 mt-1">{offer.description}</p>
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-700">Termeni:</span>
+                          <p className="text-gray-600 mt-1">{offer.terms}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-3 pt-4 border-t border-gray-300">
+                        <button
+                          onClick={() => handleAcceptOffer(offer.id)}
+                          className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors"
+                        >
+                          ✓ Acceptă și Creează Comandă
+                        </button>
+                        <button
+                          onClick={() => handleRejectOffer(offer.id)}
+                          className="flex-1 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold transition-colors"
+                        >
+                          ✗ Respinge Oferta
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
 
           {/* No offers message */}
           {offers.length === 0 && (user?.role === 'admin' || user?.role === 'client') && (

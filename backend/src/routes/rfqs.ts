@@ -221,6 +221,70 @@ router.patch('/:id/publish', requireRole('admin'), async (req: AuthRequest, res:
 });
 
 /**
+ * PATCH /api/rfqs/:id/send-to-client
+ * Send final offer to client (Admin only)
+ */
+router.patch('/:id/send-to-client', requireRole('admin'), async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { offerId } = req.body;
+
+    // Check if RFQ exists
+    const rfq = await prisma.rFQ.findUnique({
+      where: { id },
+      include: {
+        offers: true,
+      },
+    });
+
+    if (!rfq) {
+      res.status(404).json({ error: 'Cererea RFQ nu a fost găsită' });
+      return;
+    }
+
+    // Verify the offer belongs to this RFQ and is final_confirmed
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+    });
+
+    if (!offer || offer.rfqId !== id) {
+      res.status(400).json({ error: 'Oferta nu aparține acestei cereri RFQ' });
+      return;
+    }
+
+    if (offer.status !== 'final_confirmed') {
+      res.status(400).json({ error: 'Doar ofertele confirmate final pot fi trimise către client' });
+      return;
+    }
+
+    // Update RFQ status to sent_to_client
+    const updatedRFQ = await prisma.rFQ.update({
+      where: { id },
+      data: {
+        status: 'sent_to_client',
+      },
+      include: {
+        client: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      rfq: updatedRFQ,
+      message: 'Oferta finală a fost trimisă către client',
+    });
+  } catch (error) {
+    console.error('Send to client error:', error);
+    res.status(500).json({ error: 'Eroare la trimiterea ofertei către client' });
+  }
+});
+
+/**
  * DELETE /api/rfqs/:id
  * Delete RFQ (only Draft status can be deleted)
  */
