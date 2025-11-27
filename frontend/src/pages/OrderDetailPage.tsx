@@ -6,7 +6,7 @@ import { Order } from '../types';
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,6 +77,11 @@ export default function OrderDetailPage() {
     }
   };
 
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'created':
@@ -123,29 +128,71 @@ export default function OrderDetailPage() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <main className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-gray-600">Se încarcă comanda...</p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!order) {
-    return (
-      <main className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <p className="text-red-600">Comanda nu a fost găsită</p>
-        </div>
-      </main>
-    );
-  }
-
   return (
-    <main className="container mx-auto px-4 py-8">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              Platformă Licitații
+            </h1>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Deconectează-te
+            </button>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex gap-4">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Dashboard
+            </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => navigate('/users')}
+                className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+              >
+                Utilizatori
+              </button>
+            )}
+            <button
+              onClick={() => navigate('/rfqs')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Cereri RFQ
+            </button>
+            <button className="px-4 py-2 text-primary-600 border-b-2 border-primary-600 font-medium">
+              Comenzi
+            </button>
+            <button
+              onClick={() => navigate('/archive')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Arhivă
+            </button>
+          </nav>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="container mx-auto px-4 py-8">
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            <p className="mt-4 text-gray-600">Se încarcă comanda...</p>
+          </div>
+        ) : !order ? (
+          <div className="text-center py-12">
+            <p className="text-red-600">Comanda nu a fost găsită</p>
+          </div>
+        ) : (
+          <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -350,7 +397,9 @@ export default function OrderDetailPage() {
             </div>
           </div>
         )}
-      </div>
-    </main>
+          </div>
+        )}
+      </main>
+    </div>
   );
 }

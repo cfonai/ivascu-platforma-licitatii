@@ -1,9 +1,40 @@
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import api from '../lib/api';
+
+interface Statistics {
+  activeRFQs?: number;
+  offersReceived?: number;
+  activeOrders?: number;
+  rfqsPosted?: number;
+  finalOffers?: number;
+  availableRFQs?: number;
+  offersSubmitted?: number;
+  ordersWon?: number;
+}
 
 export default function DashboardPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [statistics, setStatistics] = useState<Statistics>({});
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchStatistics();
+  }, [user]);
+
+  const fetchStatistics = async () => {
+    try {
+      setIsLoading(true);
+      const response = await api.get<{ statistics: Statistics }>('/statistics');
+      setStatistics(response.data.statistics);
+    } catch (error) {
+      console.error('Error fetching statistics:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -81,6 +112,12 @@ export default function DashboardPage() {
             >
               Comenzi
             </button>
+            <button
+              onClick={() => navigate('/archive')}
+              className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"
+            >
+              Arhivă
+            </button>
             {/* TODO: Future feature - Add Statistics navigation link */}
             {/* <button onClick={() => navigate('/statistics')} className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium">Statistici</button> */}
           </nav>
@@ -118,15 +155,21 @@ export default function DashboardPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.activeRFQs || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Cereri active</div>
                 </div>
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.offersReceived || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Oferte primite</div>
                 </div>
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.activeOrders || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Comenzi active</div>
                 </div>
               </div>
@@ -141,15 +184,21 @@ export default function DashboardPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.rfqsPosted || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Cereri postate</div>
                 </div>
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.finalOffers || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Oferte finale</div>
                 </div>
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.activeOrders || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Comenzi active</div>
                 </div>
               </div>
@@ -164,52 +213,27 @@ export default function DashboardPage() {
               </p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.availableRFQs || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Cereri disponibile</div>
                 </div>
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.offersSubmitted || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Oferte depuse</div>
                 </div>
                 <div className="bg-white/10 p-4 rounded-lg">
-                  <div className="text-3xl font-bold">0</div>
+                  <div className="text-3xl font-bold">
+                    {isLoading ? '...' : (statistics.ordersWon || 0)}
+                  </div>
                   <div className="text-sm opacity-90">Comenzi câștigate</div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Info Card */}
-          <div className="card mt-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-3">
-              🚀 Status POC
-            </h3>
-            <p className="text-gray-600 mb-4">
-              Autentificarea funcționează! Următorii pași:
-            </p>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-center">
-                <span className="text-green-500 mr-2">✓</span>
-                Autentificare cu JWT
-              </li>
-              <li className="flex items-center">
-                <span className="text-green-500 mr-2">✓</span>
-                Dashboard personalizat pe roluri
-              </li>
-              <li className="flex items-center">
-                <span className="text-gray-400 mr-2">○</span>
-                Gestionare utilizatori (Admin)
-              </li>
-              <li className="flex items-center">
-                <span className="text-gray-400 mr-2">○</span>
-                Creare cereri RFQ (Client)
-              </li>
-              <li className="flex items-center">
-                <span className="text-gray-400 mr-2">○</span>
-                Depunere oferte (Furnizor)
-              </li>
-            </ul>
-          </div>
         </div>
       </main>
     </div>

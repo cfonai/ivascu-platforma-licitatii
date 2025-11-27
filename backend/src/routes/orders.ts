@@ -382,4 +382,65 @@ router.patch('/:id/archive', authenticateToken, async (req: AuthRequest, res: Re
   }
 });
 
+/**
+ * DELETE /api/orders/:id - Delete order with restrictions
+ * Only admin can delete
+ * Cannot delete orders with payment confirmed or later stages
+ */
+router.delete('/:id', authenticateToken, async (req: AuthRequest, res: Response) => {
+  try {
+    if (req.user?.role !== 'admin') {
+      return res.status(403).json({ error: 'Doar administratorii pot șterge comenzi' });
+    }
+
+    const { id } = req.params;
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        rfq: { select: { id: true, status: true } },
+        offer: { select: { id: true, status: true } },
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Comanda nu a fost găsită' });
+    }
+
+    // Business rules: Can only delete orders in 'created' or 'payment_initiated' status
+    // Cannot delete if payment is confirmed or delivery has started
+    const deletableStatuses = ['created', 'payment_initiated'];
+    if (!deletableStatuses.includes(order.status)) {
+      return res.status(400).json({
+        error: 'Nu se poate șterge comanda după ce plata a fost confirmată sau livrarea a început',
+        currentStatus: order.status,
+      });
+    }
+
+    // Revert RFQ status back to appropriate state
+    if (order.rfq.status === 'closed') {
+      await prisma.rFQ.update({
+        where: { id: order.rfqId },
+        data: { status: 'sent_to_client' },
+      });
+    }
+
+    // Unlock the offer so it can be reused if needed
+    await prisma.offer.update({
+      where: { id: order.offerId },
+      data: { isLocked: false },
+    });
+
+    // Delete the order
+    await prisma.order.delete({
+      where: { id },
+    });
+
+    res.json({ message: 'Comanda a fost ștearsă cu succes' });
+  } catch (error) {
+    console.error('Error deleting order:', error);
+    res.status(500).json({ error: 'Eroare la ștergerea comenzii' });
+  }
+});
+
 export default router;
