@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../lib/prisma';
 import { authenticateToken, requireRole, AuthRequest } from '../middleware/auth';
+import { sendNewSupplierOfferNotification } from '../features/NotificationGatekeeperPOC/telegram/bot';
 
 const router = Router();
 
@@ -88,6 +89,27 @@ router.post('/', requireRole('supplier'), async (req: AuthRequest, res: Response
         where: { id: rfqId },
         data: { status: 'offers_received' },
       });
+    }
+
+    // POC: Send Telegram notification to admin about new offer (if Gatekeeper is enabled)
+    try {
+      const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+      const gatekeeperEnabled = process.env.GATEKEEPER_ENABLED === 'true';
+
+      if (adminChatId && gatekeeperEnabled) {
+        await sendNewSupplierOfferNotification(adminChatId, {
+          offerId: offer.id,
+          rfqTitle: offer.rfq.title,
+          supplierName: offer.supplier.username,
+          price: offer.price,
+          deliveryTime: offer.deliveryTime,
+          description: offer.description,
+        });
+        console.log(`📱 Telegram notification sent for new offer: ${offer.id}`);
+      }
+    } catch (telegramError) {
+      // Don't fail the request if Telegram notification fails
+      console.error('Failed to send Telegram notification:', telegramError);
     }
 
     res.status(201).json({

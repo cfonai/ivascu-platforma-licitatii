@@ -17,6 +17,11 @@ import {
   createNegotiationStartConfirmation,
   createStatsMessage,
   createErrorMessage,
+  createNewSupplierOfferMessage,
+  createNegotiationResponseMessage,
+  createAcceptOfferConfirmation,
+  createRejectOfferConfirmation,
+  createOfferNegotiationStartConfirmation,
 } from './messages';
 import { generateDailyDigest, generateDailyStats } from '../gatekeeper/scoreAI';
 
@@ -147,6 +152,18 @@ function setupCallbackHandlers() {
           break;
         case 'details':
           await handleViewDetails(chatId, rfqId);
+          break;
+        case 'accept_offer':
+          await handleAcceptOffer(chatId, rfqId, query.message!.message_id);
+          break;
+        case 'reject_offer':
+          await handleRejectOffer(chatId, rfqId, query.message!.message_id);
+          break;
+        case 'start_offer_negotiation':
+          await handleStartOfferNegotiation(chatId, rfqId, query.message!.message_id);
+          break;
+        case 'view_offer_details':
+          await handleViewOfferDetails(chatId, rfqId);
           break;
       }
 
@@ -294,6 +311,247 @@ async function handleViewDetails(chatId: number, rfqId: string) {
     return { success: true, rfqId };
   } catch (error) {
     console.error('Eroare la detalii:', error);
+    return { success: false, error };
+  }
+}
+
+/**
+ * Handler pentru acceptare ofertă
+ */
+async function handleAcceptOffer(chatId: number, offerId: string, messageId: number) {
+  try {
+    console.log(`✅ Acceptare ofertă: ${offerId}`);
+
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      include: {
+        rfq: true,
+        supplier: { select: { username: true } },
+      },
+    });
+
+    if (!offer) {
+      bot?.sendMessage(chatId, createErrorMessage('Oferta nu a fost găsită.'));
+      return { success: false, error: 'Offer not found' };
+    }
+
+    // Update offer status to accepted
+    await prisma.offer.update({
+      where: { id: offerId },
+      data: {
+        status: 'accepted',
+        isLocked: true,
+      },
+    });
+
+    // Update RFQ status
+    await prisma.rFQ.update({
+      where: { id: offer.rfqId },
+      data: { status: 'order_created' },
+    });
+
+    console.log(`✅ Ofertă ${offerId} acceptată cu succes din Telegram`);
+
+    bot?.editMessageReplyMarkup(
+      { inline_keyboard: [] },
+      { chat_id: chatId, message_id: messageId }
+    );
+
+    bot?.sendMessage(
+      chatId,
+      createAcceptOfferConfirmation(offer.rfq.title, offer.supplier.username),
+      { parse_mode: 'Markdown' }
+    );
+
+    return { success: true, offerId };
+  } catch (error) {
+    console.error('Eroare la acceptare ofertă:', error);
+    bot?.sendMessage(chatId, createErrorMessage('Nu am putut accepta oferta.'));
+    return { success: false, error };
+  }
+}
+
+/**
+ * Handler pentru respingere ofertă
+ */
+async function handleRejectOffer(chatId: number, offerId: string, messageId: number) {
+  try {
+    console.log(`❌ Respingere ofertă: ${offerId}`);
+
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      include: {
+        rfq: { select: { title: true } },
+        supplier: { select: { username: true } },
+      },
+    });
+
+    if (!offer) {
+      bot?.sendMessage(chatId, createErrorMessage('Oferta nu a fost găsită.'));
+      return { success: false, error: 'Offer not found' };
+    }
+
+    await prisma.offer.update({
+      where: { id: offerId },
+      data: { status: 'rejected' },
+    });
+
+    console.log(`✅ Ofertă ${offerId} respinsă cu succes din Telegram`);
+
+    bot?.editMessageReplyMarkup(
+      { inline_keyboard: [] },
+      { chat_id: chatId, message_id: messageId }
+    );
+
+    bot?.sendMessage(
+      chatId,
+      createRejectOfferConfirmation(offer.rfq.title, offer.supplier.username),
+      { parse_mode: 'Markdown' }
+    );
+
+    return { success: true, offerId };
+  } catch (error) {
+    console.error('Eroare la respingere ofertă:', error);
+    bot?.sendMessage(chatId, createErrorMessage('Nu am putut respinge oferta.'));
+    return { success: false, error };
+  }
+}
+
+/**
+ * Handler pentru începere negociere ofertă
+ */
+async function handleStartOfferNegotiation(chatId: number, offerId: string, messageId: number) {
+  try {
+    console.log(`🤝 Începere negociere ofertă: ${offerId}`);
+
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      include: {
+        rfq: { select: { title: true } },
+        supplier: { select: { id: true, username: true } },
+      },
+    });
+
+    if (!offer) {
+      bot?.sendMessage(chatId, createErrorMessage('Oferta nu a fost găsită.'));
+      return { success: false, error: 'Offer not found' };
+    }
+
+    // Get admin user (assumes first admin)
+    const admin = await prisma.user.findFirst({ where: { role: 'admin' } });
+    if (!admin) {
+      bot?.sendMessage(chatId, createErrorMessage('Nu s-a găsit administrator.'));
+      return { success: false, error: 'Admin not found' };
+    }
+
+    // Check if negotiation already exists
+    const existingNegotiation = await prisma.negotiation.findFirst({
+      where: { offerId, status: 'active' },
+    });
+
+    if (existingNegotiation) {
+      bot?.sendMessage(chatId, createErrorMessage('Există deja o negociere activă pentru această ofertă.'));
+      return { success: false, error: 'Negotiation already exists' };
+    }
+
+    // Create negotiation
+    const negotiation = await prisma.negotiation.create({
+      data: {
+        offerId,
+        rfqId: offer.rfqId,
+        adminId: admin.id,
+        supplierId: offer.supplierId,
+        rounds: 1,
+        status: 'active',
+      },
+    });
+
+    // Create first message
+    await prisma.negotiationMessage.create({
+      data: {
+        negotiationId: negotiation.id,
+        senderId: admin.id,
+        senderRole: 'admin',
+        roundNumber: 1,
+        message: 'Negociere inițiată din Telegram. Te rog să răspunzi cu o contraofertă.',
+      },
+    });
+
+    // Update offer status
+    await prisma.offer.update({
+      where: { id: offerId },
+      data: { status: 'in_negotiation' },
+    });
+
+    // Update RFQ status
+    await prisma.rFQ.update({
+      where: { id: offer.rfqId },
+      data: { status: 'negotiation' },
+    });
+
+    console.log(`✅ Negociere inițiată pentru oferta ${offerId} din Telegram`);
+
+    bot?.editMessageReplyMarkup(
+      { inline_keyboard: [] },
+      { chat_id: chatId, message_id: messageId }
+    );
+
+    bot?.sendMessage(
+      chatId,
+      createOfferNegotiationStartConfirmation(offer.rfq.title, offer.supplier.username),
+      { parse_mode: 'Markdown' }
+    );
+
+    return { success: true, offerId, negotiationId: negotiation.id };
+  } catch (error) {
+    console.error('Eroare la inițiere negociere:', error);
+    bot?.sendMessage(chatId, createErrorMessage('Nu am putut iniția negocierea.'));
+    return { success: false, error };
+  }
+}
+
+/**
+ * Handler pentru vizualizare detalii ofertă
+ */
+async function handleViewOfferDetails(chatId: number, offerId: string) {
+  try {
+    console.log(`📊 Detalii ofertă: ${offerId}`);
+
+    const offer = await prisma.offer.findUnique({
+      where: { id: offerId },
+      include: {
+        rfq: { select: { title: true } },
+        supplier: { select: { username: true } },
+      },
+    });
+
+    if (!offer) {
+      bot?.sendMessage(chatId, createErrorMessage('Oferta nu a fost găsită.'));
+      return { success: false, error: 'Offer not found' };
+    }
+
+    bot?.sendMessage(
+      chatId,
+      `📊 **Detalii Ofertă Complete**
+
+📋 **RFQ:** ${offer.rfq.title}
+👤 **Furnizor:** ${offer.supplier.username}
+💰 **Preț:** ${offer.price.toLocaleString('ro-RO')} RON
+🚚 **Livrare:** ${offer.deliveryTime}
+
+**Descriere:**
+${offer.description}
+
+**Termeni:**
+${offer.terms}
+
+Pentru detalii complete, accesează platforma web.`,
+      { parse_mode: 'Markdown' }
+    );
+
+    return { success: true, offerId };
+  } catch (error) {
+    console.error('Eroare la detalii ofertă:', error);
     return { success: false, error };
   }
 }
@@ -451,6 +709,88 @@ export async function sendDailyDigest(chatId: string, stats: any) {
 }
 
 /**
+ * Trimite notificare pentru ofertă nouă de la furnizor
+ */
+export async function sendNewSupplierOfferNotification(
+  chatId: string,
+  data: {
+    offerId: string;
+    rfqTitle: string;
+    supplierName: string;
+    price: number;
+    deliveryTime: string;
+    description: string;
+  }
+) {
+  if (!bot) return;
+
+  const message = createNewSupplierOfferMessage(data);
+
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '✅ Acceptă Oferta', callback_data: `accept_offer:${data.offerId}` },
+        { text: '❌ Respinge', callback_data: `reject_offer:${data.offerId}` },
+      ],
+      [
+        { text: '🤝 Începe Negociere', callback_data: `start_offer_negotiation:${data.offerId}` },
+      ],
+      [{ text: '📊 Detalii Complete', callback_data: `view_offer_details:${data.offerId}` }],
+    ],
+  };
+
+  await bot.sendMessage(chatId, message, {
+    parse_mode: 'Markdown',
+    reply_markup: keyboard,
+  });
+}
+
+/**
+ * Trimite notificare pentru răspuns furnizor la negociere
+ */
+export async function sendNegotiationResponseNotification(
+  chatId: string,
+  data: {
+    negotiationId: string;
+    offerId: string;
+    rfqTitle: string;
+    supplierName: string;
+    roundNumber: number;
+    message: string;
+    proposedPrice?: number;
+    proposedDeliveryTime?: string;
+    acceptedFinal?: boolean;
+  }
+) {
+  if (!bot) return;
+
+  const message = createNegotiationResponseMessage(data);
+
+  // If supplier accepted final, no more buttons needed
+  if (data.acceptedFinal) {
+    await bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    return;
+  }
+
+  // Otherwise, show options to continue negotiation
+  // Use offerId for accept/reject buttons so they can update the offer
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '✅ Acceptă Contraoferta', callback_data: `accept_offer:${data.offerId}` },
+        { text: '❌ Respinge', callback_data: `reject_offer:${data.offerId}` },
+      ],
+      [{ text: '📊 Vezi Detalii Negociere', callback_data: `view_offer_details:${data.offerId}` }],
+    ],
+  };
+
+  await bot.sendMessage(chatId, message, {
+    parse_mode: 'Markdown',
+    reply_markup: keyboard,
+  });
+}
+
+/**
  * Oprește bot-ul
  */
 export function stopTelegramBot() {
@@ -467,4 +807,8 @@ export const telegramHandlers = {
   handleRejectRFQ,
   handleStartNegotiation,
   handleViewDetails,
+  handleAcceptOffer,
+  handleRejectOffer,
+  handleStartOfferNegotiation,
+  handleViewOfferDetails,
 };

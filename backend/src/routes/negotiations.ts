@@ -2,6 +2,7 @@ import express, { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 import { z } from 'zod';
+import { sendNegotiationResponseNotification } from '../features/NotificationGatekeeperPOC/telegram/bot';
 
 const router = express.Router();
 const prisma = new PrismaClient();
@@ -274,6 +275,34 @@ router.post('/:id/respond', authenticateToken, async (req: AuthRequest, res: Res
         },
       });
 
+      // POC: Send Telegram notification about acceptance (if Gatekeeper is enabled)
+      try {
+        const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+        const gatekeeperEnabled = process.env.GATEKEEPER_ENABLED === 'true';
+
+        if (adminChatId && gatekeeperEnabled) {
+          const rfq = await prisma.rFQ.findUnique({ where: { id: negotiation.rfqId }, select: { title: true } });
+          const supplier = await prisma.user.findUnique({ where: { id: negotiation.supplierId }, select: { username: true } });
+
+          if (rfq && supplier) {
+            await sendNegotiationResponseNotification(adminChatId, {
+              negotiationId: id,
+              offerId: negotiation.offerId,
+              rfqTitle: rfq.title,
+              supplierName: supplier.username,
+              roundNumber: negotiation.rounds,
+              message,
+              proposedPrice,
+              proposedDeliveryTime,
+              acceptedFinal: true,
+            });
+            console.log(`📱 Telegram notification sent: Supplier accepted final offer for negotiation ${id}`);
+          }
+        }
+      } catch (telegramError) {
+        console.error('Failed to send Telegram notification:', telegramError);
+      }
+
       return res.json({ message: 'Oferta finală a fost confirmată și blocată', completed: true });
     }
 
@@ -282,6 +311,34 @@ router.post('/:id/respond', authenticateToken, async (req: AuthRequest, res: Res
       where: { id },
       data: { rounds: negotiation.rounds + 1 },
     });
+
+    // POC: Send Telegram notification about counter-proposal (if Gatekeeper is enabled)
+    try {
+      const adminChatId = process.env.TELEGRAM_ADMIN_CHAT_ID;
+      const gatekeeperEnabled = process.env.GATEKEEPER_ENABLED === 'true';
+
+      if (adminChatId && gatekeeperEnabled) {
+        const rfq = await prisma.rFQ.findUnique({ where: { id: negotiation.rfqId }, select: { title: true } });
+        const supplier = await prisma.user.findUnique({ where: { id: negotiation.supplierId }, select: { username: true } });
+
+        if (rfq && supplier) {
+          await sendNegotiationResponseNotification(adminChatId, {
+            negotiationId: id,
+            offerId: negotiation.offerId,
+            rfqTitle: rfq.title,
+            supplierName: supplier.username,
+            roundNumber: negotiation.rounds + 1,
+            message,
+            proposedPrice,
+            proposedDeliveryTime,
+            acceptedFinal: false,
+          });
+          console.log(`📱 Telegram notification sent: Supplier responded to negotiation ${id}, round ${negotiation.rounds + 1}`);
+        }
+      }
+    } catch (telegramError) {
+      console.error('Failed to send Telegram notification:', telegramError);
+    }
 
     res.json({ message: 'Răspuns trimis cu succes' });
   } catch (error) {

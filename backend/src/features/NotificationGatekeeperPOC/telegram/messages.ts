@@ -229,3 +229,101 @@ Folosește comanda /help pentru a vedea toate opțiunile disponibile.
 
 Să începem! 🚀`;
 }
+
+/**
+ * Mesaj pentru ofertă nouă de la furnizor
+ */
+export function createNewSupplierOfferMessage(data: {
+  offerId: string;
+  rfqTitle: string;
+  supplierName: string;
+  price: number;
+  deliveryTime: string;
+  description: string;
+}): string {
+  return `💼 **Ofertă Nouă de la Furnizor**
+
+📋 **RFQ:** ${data.rfqTitle}
+👤 **Furnizor:** ${data.supplierName}
+💰 **Preț Oferit:** ${data.price.toLocaleString('ro-RO')} RON
+🚚 **Termen Livrare:** ${data.deliveryTime}
+
+**Descriere Ofertă:**
+${data.description.substring(0, 200)}${data.description.length > 200 ? '...' : ''}
+
+---
+**Ce vrei să faci?**`;
+}
+
+/**
+ * Mesaj pentru răspuns furnizor la negociere
+ */
+export function createNegotiationResponseMessage(data: {
+  negotiationId: string;
+  rfqTitle: string;
+  supplierName: string;
+  roundNumber: number;
+  message: string;
+  proposedPrice?: number;
+  proposedDeliveryTime?: string;
+  acceptedFinal?: boolean;
+}): string {
+  if (data.acceptedFinal) {
+    return `✅ **Furnizor a Acceptat Oferta Finală!**
+
+📋 **RFQ:** ${data.rfqTitle}
+👤 **Furnizor:** ${data.supplierName}
+${data.proposedPrice ? `💰 **Preț Final:** ${data.proposedPrice.toLocaleString('ro-RO')} RON\n` : ''}
+${data.proposedDeliveryTime ? `🚚 **Livrare:** ${data.proposedDeliveryTime}\n` : ''}
+
+🎉 **Negocierea s-a încheiat cu succes!**
+
+Poți acum să trimiți oferta către client pentru aprobare finală.`;
+  }
+
+  return `🔄 **Răspuns la Negociere - Runda ${data.roundNumber}**
+
+📋 **RFQ:** ${data.rfqTitle}
+👤 **Furnizor:** ${data.supplierName}
+${data.proposedPrice ? `💰 **Preț Propus:** ${data.proposedPrice.toLocaleString('ro-RO')} RON\n` : ''}
+${data.proposedDeliveryTime ? `🚚 **Livrare Propusă:** ${data.proposedDeliveryTime}\n` : ''}
+
+**Mesaj Furnizor:**
+${data.message}
+
+---
+**Ce vrei să faci?**`;
+}
+
+/**
+ * Mesaj confirmare acceptare ofertă
+ */
+export function createAcceptOfferConfirmation(rfqTitle: string, supplierName: string): string {
+  return `✅ **Ofertă Acceptată cu Succes**
+
+Oferta de la "${supplierName}" pentru RFQ "${rfqTitle}" a fost acceptată.
+
+Comanda va fi creată automat și trimisă către client.`;
+}
+
+/**
+ * Mesaj confirmare respingere ofertă
+ */
+export function createRejectOfferConfirmation(rfqTitle: string, supplierName: string): string {
+  return `❌ **Ofertă Respinsă**
+
+Oferta de la "${supplierName}" pentru RFQ "${rfqTitle}" a fost respinsă.
+
+Furnizorul va fi notificat.`;
+}
+
+/**
+ * Mesaj confirmare începere negociere pentru ofertă
+ */
+export function createOfferNegotiationStartConfirmation(rfqTitle: string, supplierName: string): string {
+  return `🤝 **Negociere Inițiată cu Furnizor**
+
+Am început negocierea cu "${supplierName}" pentru RFQ "${rfqTitle}".
+
+Vei primi notificări când furnizorul răspunde.`;
+}
