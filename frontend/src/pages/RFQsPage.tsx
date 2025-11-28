@@ -144,14 +144,22 @@ export default function RFQsPage() {
             <h1 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
               Cereri RFQ
             </h1>
-            {user?.role === 'client' && (
+            <div className="flex gap-3">
               <button
-                onClick={() => setShowCreateModal(true)}
-                className="btn-gradient btn-gradient-success"
+                onClick={fetchRFQs}
+                className="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-lg font-medium transition"
               >
-                + Crează Cerere RFQ
+                🔄 Reîmprospătează
               </button>
-            )}
+              {user?.role === 'client' && (
+                <button
+                  onClick={() => setShowCreateModal(true)}
+                  className="btn-gradient btn-gradient-success"
+                >
+                  + Crează Cerere RFQ
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Navigation */}
@@ -173,6 +181,14 @@ export default function RFQsPage() {
             <button className="px-4 py-2 text-primary-600 border-b-2 border-primary-600 font-medium">
               Cereri RFQ
             </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => navigate('/admin/oferte-respinse')}
+                className="px-4 py-2 text-red-600 hover:text-red-700 transition-colors font-medium"
+              >
+                🗑️ Respinse Automat
+              </button>
+            )}
             <button
               onClick={() => navigate('/orders')}
               className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"

@@ -106,6 +106,14 @@ export default function DashboardPage() {
             >
               Cereri RFQ
             </button>
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => navigate('/admin/oferte-respinse')}
+                className="px-4 py-2 text-red-600 hover:text-red-700 transition-colors font-medium"
+              >
+                🗑️ Respinse Automat
+              </button>
+            )}
             <button
               onClick={() => navigate('/orders')}
               className="px-4 py-2 text-gray-700 hover:text-primary-600 transition-colors font-medium"

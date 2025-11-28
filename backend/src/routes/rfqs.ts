@@ -80,8 +80,12 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     } else if (userRole === 'supplier') {
       // Suppliers can only see published RFQs
       where.status = { in: ['published', 'offers_received', 'negotiation'] };
+    } else if (userRole === 'admin') {
+      // POC: Admins see all RFQs EXCEPT auto-rejected ones (those are in separate page)
+      where.NOT = {
+        gatekeeperStatus: 'auto_rejected',
+      };
     }
-    // Admins can see all RFQs (no filter)
 
     const rfqs = await prisma.rFQ.findMany({
       where,

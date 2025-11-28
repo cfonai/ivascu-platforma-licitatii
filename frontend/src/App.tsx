@@ -10,6 +10,7 @@ import OrdersPage from './pages/OrdersPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import ArchivePage from './pages/ArchivePage';
 import SupplierMapPage from './features/SupplierMap/SupplierMapPage';
+import AutoRejectedRFQsPage from './pages/AutoRejectedRFQsPage';
 
 function App() {
   return (
@@ -81,6 +82,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <SupplierMapPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/oferte-respinse"
+            element={
+              <ProtectedRoute>
+                <AutoRejectedRFQsPage />
               </ProtectedRoute>
             }
           />

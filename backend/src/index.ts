@@ -10,6 +10,10 @@ import negotiationRoutes from './routes/negotiations';
 import orderRoutes from './routes/orders';
 import statisticsRoutes from './routes/statistics';
 
+// POC: Gatekeeper Routes
+import gatekeeperRoutes from './features/NotificationGatekeeperPOC/routes';
+import { startGatekeeperService } from './features/NotificationGatekeeperPOC/service';
+
 dotenv.config();
 
 const app = express();
@@ -59,9 +63,20 @@ app.use('/api/negotiations', negotiationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/statistics', statisticsRoutes);
 
+// POC: Gatekeeper Routes
+app.use('/api/poc/gatekeeper', gatekeeperRoutes);
+
 // Start server
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+
+  // POC: Start Gatekeeper Service (doar dacă Telegram este configurat)
+  if (process.env.GATEKEEPER_ENABLED === 'true') {
+    console.log('\n🤖 Pornire Centru Decizii AI...');
+    startGatekeeperService();
+  } else {
+    console.log('\nℹ️ Gatekeeper POC dezactivat (GATEKEEPER_ENABLED=false)');
+  }
 });

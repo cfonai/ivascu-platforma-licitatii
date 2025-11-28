@@ -15,6 +15,18 @@ model User {
   role                 String
   createdAt            DateTime             @default(now())
   createdBy            String?
+
+  // POC: Client Profile Fields (optional - pentru demo AI)
+  companyName          String?
+  companyAge           Int?
+  annualRevenue        Float?
+  reputationScore      Float?              @default(5.0)  // 0-5 stele
+  financialScore       Int?                @default(75)   // 0-100
+  completedRFQs        Int?                @default(0)
+  rejectedRFQs         Int?                @default(0)
+  categoryExpertise    String?             // ex: "IT,Constructii,Logistica"
+  location             String?             // ex: "Bucuresti"
+
   adminNegotiations    Negotiation[]        @relation("AdminNegotiations")
   supplierNegotiations Negotiation[]        @relation("SupplierNegotiations")
   sentMessages         NegotiationMessage[]
@@ -36,10 +48,20 @@ model RFQ {
   createdAt    DateTime      @default(now())
   publishedAt  DateTime?
   closedAt     DateTime?
+
+  // POC: Gatekeeper AI Fields (optional - pentru demo)
+  gatekeeperStatus    String?   // "pending", "auto_approved", "auto_rejected", "flagged"
+  riskLevel           String?   // "normal", "high_value", "high_risk"
+  autoProcessedAt     DateTime?
+  aiDecisionReason    String?   // Explicatie AI pentru decizie
+  aiConfidenceScore   Float?    // 0-100
+  suggestedSuppliers  String?   // IDs separate prin virgula
+
   negotiations Negotiation[]
   offers       Offer[]
   orders       Order[]
   client       User          @relation("ClientRFQs", fields: [clientId], references: [id])
+  logs         GatekeeperLog[]
 }
 
 model Offer {
@@ -110,4 +132,19 @@ model Order {
   offer             Offer     @relation(fields: [offerId], references: [id])
   rfq               RFQ       @relation(fields: [rfqId], references: [id])
   supplier          User      @relation("SupplierOrders", fields: [supplierId], references: [id])
+}
+
+// POC: Gatekeeper AI - Audit Log
+model GatekeeperLog {
+  id              String   @id @default(uuid())
+  rfqId           String
+  decision        String   // "auto_approved", "auto_rejected", "flagged_high_risk"
+  reason          String   // Explicatie decizie AI
+  aiScore         Float    // Scor incredere 0-100
+  riskLevel       String   // "normal", "high_value", "high_risk"
+  clientReputation Float?
+  rfqValue        Float?
+  processedAt     DateTime @default(now())
+
+  rfq             RFQ      @relation(fields: [rfqId], references: [id], onDelete: Cascade)
 }
