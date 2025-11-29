@@ -325,8 +325,8 @@ async function handleAcceptOffer(chatId: number, offerId: string, messageId: num
     const offer = await prisma.offer.findUnique({
       where: { id: offerId },
       include: {
-        rfq: true,
-        supplier: { select: { username: true } },
+        rfq: { include: { client: { select: { id: true } } } },
+        supplier: { select: { id: true, username: true } },
       },
     });
 
@@ -335,22 +335,79 @@ async function handleAcceptOffer(chatId: number, offerId: string, messageId: num
       return { success: false, error: 'Offer not found' };
     }
 
-    // Update offer status to accepted
+    // Check if order already exists
+    const existingOrder = await prisma.order.findFirst({
+      where: { offerId },
+    });
+
+    if (existingOrder) {
+      bot?.sendMessage(chatId, createErrorMessage('Comanda există deja pentru această ofertă.'));
+      return { success: false, error: 'Order already exists' };
+    }
+
+    // Check if there's an active negotiation with a counter-offer
+    const negotiation = await prisma.negotiation.findFirst({
+      where: { offerId, status: 'active' },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    // Use negotiated price if available, otherwise use original offer price
+    const latestMessage = negotiation?.messages[0];
+    const finalPrice = latestMessage?.proposedPrice || offer.price;
+    const finalDeliveryTime = latestMessage?.proposedDeliveryTime || offer.deliveryTime;
+
+    // Update offer with negotiated terms
     await prisma.offer.update({
       where: { id: offerId },
       data: {
         status: 'accepted',
         isLocked: true,
+        price: finalPrice,
+        deliveryTime: finalDeliveryTime,
       },
     });
 
-    // Update RFQ status
-    await prisma.rFQ.update({
-      where: { id: offer.rfqId },
-      data: { status: 'order_created' },
+    // Create Order (admin accepts directly on behalf of client)
+    const order = await prisma.order.create({
+      data: {
+        rfqId: offer.rfqId,
+        offerId,
+        clientId: offer.rfq.client.id,
+        supplierId: offer.supplier.id,
+        finalPrice,
+        finalTerms: offer.terms,
+        status: 'created',
+        isLocked: true,
+        paymentMockStatus: 'pending',
+        deliveryStatus: 'pending',
+      },
     });
 
-    console.log(`✅ Ofertă ${offerId} acceptată cu succes din Telegram`);
+    // Update RFQ status to closed (order created)
+    await prisma.rFQ.update({
+      where: { id: offer.rfqId },
+      data: { status: 'closed' },
+    });
+
+    // Complete negotiation if exists
+    if (negotiation) {
+      await prisma.negotiation.update({
+        where: { id: negotiation.id },
+        data: {
+          status: 'completed',
+          completedAt: new Date(),
+        },
+      });
+    }
+
+    console.log(
+      `✅ Ofertă ${offerId} acceptată la prețul ${finalPrice} RON și comandă ${order.id} creată cu succes din Telegram`
+    );
 
     bot?.editMessageReplyMarkup(
       { inline_keyboard: [] },
@@ -363,7 +420,7 @@ async function handleAcceptOffer(chatId: number, offerId: string, messageId: num
       { parse_mode: 'Markdown' }
     );
 
-    return { success: true, offerId };
+    return { success: true, offerId, orderId: order.id };
   } catch (error) {
     console.error('Eroare la acceptare ofertă:', error);
     bot?.sendMessage(chatId, createErrorMessage('Nu am putut accepta oferta.'));

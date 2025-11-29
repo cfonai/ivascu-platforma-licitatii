@@ -231,6 +231,13 @@ Să începem! 🚀`;
 }
 
 /**
+ * Escape Markdown special characters for Telegram
+ */
+function escapeMarkdown(text: string): string {
+  return text.replace(/([_*\[\]()~`>#+\-=|{}.!])/g, '\\$1');
+}
+
+/**
  * Mesaj pentru ofertă nouă de la furnizor
  */
 export function createNewSupplierOfferMessage(data: {
@@ -241,15 +248,17 @@ export function createNewSupplierOfferMessage(data: {
   deliveryTime: string;
   description: string;
 }): string {
+  const descriptionPreview = data.description.substring(0, 200) + (data.description.length > 200 ? '...' : '');
+
   return `💼 **Ofertă Nouă de la Furnizor**
 
-📋 **RFQ:** ${data.rfqTitle}
-👤 **Furnizor:** ${data.supplierName}
+📋 **RFQ:** ${escapeMarkdown(data.rfqTitle)}
+👤 **Furnizor:** ${escapeMarkdown(data.supplierName)}
 💰 **Preț Oferit:** ${data.price.toLocaleString('ro-RO')} RON
-🚚 **Termen Livrare:** ${data.deliveryTime}
+🚚 **Termen Livrare:** ${escapeMarkdown(data.deliveryTime)}
 
 **Descriere Ofertă:**
-${data.description.substring(0, 200)}${data.description.length > 200 ? '...' : ''}
+${escapeMarkdown(descriptionPreview)}
 
 ---
 **Ce vrei să faci?**`;
@@ -271,10 +280,10 @@ export function createNegotiationResponseMessage(data: {
   if (data.acceptedFinal) {
     return `✅ **Furnizor a Acceptat Oferta Finală!**
 
-📋 **RFQ:** ${data.rfqTitle}
-👤 **Furnizor:** ${data.supplierName}
+📋 **RFQ:** ${escapeMarkdown(data.rfqTitle)}
+👤 **Furnizor:** ${escapeMarkdown(data.supplierName)}
 ${data.proposedPrice ? `💰 **Preț Final:** ${data.proposedPrice.toLocaleString('ro-RO')} RON\n` : ''}
-${data.proposedDeliveryTime ? `🚚 **Livrare:** ${data.proposedDeliveryTime}\n` : ''}
+${data.proposedDeliveryTime ? `🚚 **Livrare:** ${escapeMarkdown(data.proposedDeliveryTime)}\n` : ''}
 
 🎉 **Negocierea s-a încheiat cu succes!**
 
@@ -283,13 +292,13 @@ Poți acum să trimiți oferta către client pentru aprobare finală.`;
 
   return `🔄 **Răspuns la Negociere - Runda ${data.roundNumber}**
 
-📋 **RFQ:** ${data.rfqTitle}
-👤 **Furnizor:** ${data.supplierName}
+📋 **RFQ:** ${escapeMarkdown(data.rfqTitle)}
+👤 **Furnizor:** ${escapeMarkdown(data.supplierName)}
 ${data.proposedPrice ? `💰 **Preț Propus:** ${data.proposedPrice.toLocaleString('ro-RO')} RON\n` : ''}
-${data.proposedDeliveryTime ? `🚚 **Livrare Propusă:** ${data.proposedDeliveryTime}\n` : ''}
+${data.proposedDeliveryTime ? `🚚 **Livrare Propusă:** ${escapeMarkdown(data.proposedDeliveryTime)}\n` : ''}
 
 **Mesaj Furnizor:**
-${data.message}
+${escapeMarkdown(data.message)}
 
 ---
 **Ce vrei să faci?**`;
@@ -301,7 +310,7 @@ ${data.message}
 export function createAcceptOfferConfirmation(rfqTitle: string, supplierName: string): string {
   return `✅ **Ofertă Acceptată cu Succes**
 
-Oferta de la "${supplierName}" pentru RFQ "${rfqTitle}" a fost acceptată.
+Oferta de la "${escapeMarkdown(supplierName)}" pentru RFQ "${escapeMarkdown(rfqTitle)}" a fost acceptată.
 
 Comanda va fi creată automat și trimisă către client.`;
 }
@@ -312,7 +321,7 @@ Comanda va fi creată automat și trimisă către client.`;
 export function createRejectOfferConfirmation(rfqTitle: string, supplierName: string): string {
   return `❌ **Ofertă Respinsă**
 
-Oferta de la "${supplierName}" pentru RFQ "${rfqTitle}" a fost respinsă.
+Oferta de la "${escapeMarkdown(supplierName)}" pentru RFQ "${escapeMarkdown(rfqTitle)}" a fost respinsă.
 
 Furnizorul va fi notificat.`;
 }
@@ -323,7 +332,7 @@ Furnizorul va fi notificat.`;
 export function createOfferNegotiationStartConfirmation(rfqTitle: string, supplierName: string): string {
   return `🤝 **Negociere Inițiată cu Furnizor**
 
-Am început negocierea cu "${supplierName}" pentru RFQ "${rfqTitle}".
+Am început negocierea cu "${escapeMarkdown(supplierName)}" pentru RFQ "${escapeMarkdown(rfqTitle)}".
 
 Vei primi notificări când furnizorul răspunde.`;
 }
