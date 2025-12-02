@@ -40,6 +40,7 @@ export function initTelegramBot(token: string): TelegramBot {
 
   setupCommands();
   setupCallbackHandlers();
+  setupConversationalHandler();
 
   return bot;
 }
@@ -176,6 +177,81 @@ function setupCallbackHandlers() {
   });
 
   console.log('✅ Callback handlers configurate');
+}
+
+/**
+ * Configurează handler conversațional pentru mesaje text
+ */
+function setupConversationalHandler() {
+  if (!bot) return;
+
+  // Listen for any text message that's not a command
+  bot.on('message', async (msg) => {
+    // Ignore commands (they start with /)
+    if (msg.text?.startsWith('/')) return;
+
+    // Ignore callback queries
+    if (!msg.text) return;
+
+    const chatId = msg.chat.id;
+    const text = msg.text.toLowerCase();
+
+    try {
+      // Detect period from message
+      let period = 'all';
+      if (text.includes('astăzi') || text.includes('azi')) {
+        period = 'today';
+      } else if (text.includes('săptămân')) {
+        period = 'week';
+      } else if (text.includes('lun')) {
+        period = 'month';
+      } else if (text.includes('an')) {
+        period = 'year';
+      }
+
+      // Handle earnings queries
+      if (text.includes('câștig') || text.includes('venit') || text.includes('comision') || text.includes('bani')) {
+        await handleEarningsQuery(chatId, period, text);
+      }
+      // Handle statistics queries
+      else if (text.includes('statistic') || text.includes('comenzi') || text.includes('rfq')) {
+        await handleStatisticsQuery(chatId, period, text);
+      }
+      // Handle top performers queries
+      else if (text.includes('top') || text.includes('clienți') || text.includes('furnizori')) {
+        await handleTopPerformersQuery(chatId, period, text);
+      }
+      // Default help response
+      else {
+        bot?.sendMessage(
+          chatId,
+          `🤖 **Îți pot ajuta cu:**
+
+💰 Întreabă despre venituri:
+• "Cât am câștigat astăzi?"
+• "Arată-mi veniturile săptămânii"
+• "Comisioane luna asta"
+
+📊 Cere statistici:
+• "Statistici astăzi"
+• "Câte comenzi am?"
+• "Ratele de conversie"
+
+🏆 Vezi top performeri:
+• "Top clienți"
+• "Top furnizori luna asta"
+
+Sau folosește comenzile: /stats /help`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+    } catch (error) {
+      console.error('Error processing conversational message:', error);
+      bot?.sendMessage(chatId, createErrorMessage('Nu am putut procesa mesajul.'));
+    }
+  });
+
+  console.log('✅ Handler conversațional configurat');
 }
 
 /**
@@ -766,7 +842,7 @@ export async function sendDailyDigest(chatId: string, stats: any) {
 }
 
 /**
- * Trimite notificare pentru ofertă nouă de la furnizor
+ * Trimite notificare pentru ofertă nouă de la furnizor - ENHANCED cu Smart Context
  */
 export async function sendNewSupplierOfferNotification(
   chatId: string,
@@ -777,6 +853,10 @@ export async function sendNewSupplierOfferNotification(
     price: number;
     deliveryTime: string;
     description: string;
+    budget?: number;
+    supplierReputation?: number;
+    supplierCompletedOrders?: number;
+    supplierOnTimeRate?: number;
   }
 ) {
   if (!bot) return;
@@ -786,11 +866,11 @@ export async function sendNewSupplierOfferNotification(
   const keyboard = {
     inline_keyboard: [
       [
-        { text: '✅ Acceptă Oferta', callback_data: `accept_offer:${data.offerId}` },
+        { text: '✅ Acceptă Rapid', callback_data: `accept_offer:${data.offerId}` },
         { text: '❌ Respinge', callback_data: `reject_offer:${data.offerId}` },
       ],
       [
-        { text: '🤝 Începe Negociere', callback_data: `start_offer_negotiation:${data.offerId}` },
+        { text: '🤝 Negociază', callback_data: `start_offer_negotiation:${data.offerId}` },
       ],
       [{ text: '📊 Detalii Complete', callback_data: `view_offer_details:${data.offerId}` }],
     ],
@@ -845,6 +925,237 @@ export async function sendNegotiationResponseNotification(
     parse_mode: 'Markdown',
     reply_markup: keyboard,
   });
+}
+
+/**
+ * Helper: Calculate commission
+ */
+function calculateCommission(orderValue: number): number {
+  if (orderValue < 100000) return orderValue * 0.10;
+  if (orderValue < 500000) return orderValue * 0.08;
+  if (orderValue < 1000000) return orderValue * 0.07;
+  return orderValue * 0.05;
+}
+
+/**
+ * Handle earnings queries
+ */
+async function handleEarningsQuery(chatId: number, period: string, text: string) {
+  const now = new Date();
+  let startDate: Date | undefined;
+
+  switch (period) {
+    case 'today':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'week':
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case 'year':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      break;
+  }
+
+  const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+
+  const orders = await prisma.order.findMany({
+    where: { status: { in: ['finalized', 'archived'] }, ...dateFilter },
+    select: { finalPrice: true },
+  });
+
+  const totalRevenue = orders.reduce((sum, o) => sum + o.finalPrice, 0);
+  const totalCommission = orders.reduce((sum, o) => sum + calculateCommission(o.finalPrice), 0);
+  const avgCommissionRate = totalRevenue > 0 ? (totalCommission / totalRevenue) * 100 : 0;
+
+  const periodLabel =
+    period === 'today'
+      ? 'astăzi'
+      : period === 'week'
+      ? 'în ultima săptămână'
+      : period === 'month'
+      ? 'luna asta'
+      : period === 'year'
+      ? 'anul asta'
+      : 'în total';
+
+  const message = `💰 **Venituri ${periodLabel.charAt(0).toUpperCase() + periodLabel.slice(1)}**
+
+🏆 **Comision câștigat:** ${totalCommission.toLocaleString('ro-RO')} RON
+📊 **Vânzări totale:** ${totalRevenue.toLocaleString('ro-RO')} RON
+📦 **Comenzi finalizate:** ${orders.length}
+📈 **Rată comision medie:** ${avgCommissionRate.toFixed(1)}%
+
+${orders.length > 0 ? `💡 **În medie:** ${(totalCommission / orders.length).toLocaleString('ro-RO')} RON per comandă` : ''}
+
+${period === 'today' && orders.length === 0 ? '💼 Nicio comandă finalizată astăzi încă.' : ''}`;
+
+  bot?.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+}
+
+/**
+ * Handle statistics queries
+ */
+async function handleStatisticsQuery(chatId: number, period: string, text: string) {
+  const now = new Date();
+  let startDate: Date | undefined;
+
+  switch (period) {
+    case 'today':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'week':
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case 'year':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      break;
+  }
+
+  const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+
+  const [totalRFQs, closedRFQs, totalOffers, acceptedOffers, completedOrders] = await Promise.all([
+    prisma.rFQ.count({ where: dateFilter }),
+    prisma.rFQ.count({ where: { status: 'closed', ...dateFilter } }),
+    prisma.offer.count({ where: dateFilter }),
+    prisma.offer.count({ where: { status: 'accepted', ...dateFilter } }),
+    prisma.order.count({ where: { status: { in: ['finalized', 'archived'] }, ...dateFilter } }),
+  ]);
+
+  const conversionRate = totalRFQs > 0 ? ((completedOrders / totalRFQs) * 100).toFixed(1) : '0';
+  const acceptanceRate = totalOffers > 0 ? ((acceptedOffers / totalOffers) * 100).toFixed(1) : '0';
+
+  const periodLabel =
+    period === 'today'
+      ? 'Astăzi'
+      : period === 'week'
+      ? 'Săptămâna Aceasta'
+      : period === 'month'
+      ? 'Luna Aceasta'
+      : period === 'year'
+      ? 'Anul Acesta'
+      : 'Total';
+
+  const message = `📊 **Statistici ${periodLabel}**
+
+📋 **RFQ-uri:**
+• Total: ${totalRFQs}
+• Finalizate: ${closedRFQs}
+• Conversie: ${conversionRate}% (RFQ → Comandă)
+
+💼 **Oferte:**
+• Primite: ${totalOffers}
+• Acceptate: ${acceptedOffers}
+• Rată acceptare: ${acceptanceRate}%
+
+📦 **Comenzi:**
+• Finalizate: ${completedOrders}
+
+${totalRFQs === 0 ? '\n💡 Nicio activitate înregistrată pentru această perioadă.' : ''}`;
+
+  bot?.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+}
+
+/**
+ * Handle top performers queries
+ */
+async function handleTopPerformersQuery(chatId: number, period: string, text: string) {
+  const now = new Date();
+  let startDate: Date | undefined;
+
+  switch (period) {
+    case 'today':
+      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case 'week':
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case 'month':
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      break;
+    case 'year':
+      startDate = new Date(now.getFullYear(), 0, 1);
+      break;
+  }
+
+  const dateFilter = startDate ? { createdAt: { gte: startDate } } : {};
+
+  const orders = await prisma.order.findMany({
+    where: { status: { in: ['finalized', 'archived'] }, ...dateFilter },
+    include: {
+      client: { select: { username: true } },
+      supplier: { select: { username: true, reputationScore: true } },
+    },
+  });
+
+  const clientStats: Record<string, { count: number; revenue: number }> = {};
+  const supplierStats: Record<string, { count: number; revenue: number; rating: number }> = {};
+
+  orders.forEach((order) => {
+    if (!clientStats[order.client.username]) {
+      clientStats[order.client.username] = { count: 0, revenue: 0 };
+    }
+    clientStats[order.client.username].count++;
+    clientStats[order.client.username].revenue += order.finalPrice;
+
+    if (!supplierStats[order.supplier.username]) {
+      supplierStats[order.supplier.username] = { count: 0, revenue: 0, rating: order.supplier.reputationScore || 0 };
+    }
+    supplierStats[order.supplier.username].count++;
+    supplierStats[order.supplier.username].revenue += order.finalPrice;
+  });
+
+  const top3Clients = Object.entries(clientStats)
+    .sort(([, a], [, b]) => b.revenue - a.revenue)
+    .slice(0, 3);
+
+  const top3Suppliers = Object.entries(supplierStats)
+    .sort(([, a], [, b]) => b.revenue - a.revenue)
+    .slice(0, 3);
+
+  const periodLabel =
+    period === 'today'
+      ? 'Astăzi'
+      : period === 'week'
+      ? 'Săptămâna Aceasta'
+      : period === 'month'
+      ? 'Luna Aceasta'
+      : period === 'year'
+      ? 'Anul Acesta'
+      : 'All Time';
+
+  let message = `🏆 **Top Performeri ${periodLabel}**\n\n`;
+
+  if (text.includes('clienți') || !text.includes('furnizori')) {
+    message += `**🥇 Top Clienți:**\n`;
+    if (top3Clients.length > 0) {
+      top3Clients.forEach(([name, stats], idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+        message += `${medal} **${name}**\n   ${stats.count} comenzi • ${stats.revenue.toLocaleString('ro-RO')} RON\n`;
+      });
+    } else {
+      message += `_Niciun client activ_\n`;
+    }
+  }
+
+  if (text.includes('furnizori') || !text.includes('clienți')) {
+    message += `\n**⭐ Top Furnizori:**\n`;
+    if (top3Suppliers.length > 0) {
+      top3Suppliers.forEach(([name, stats], idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+        message += `${medal} **${name}** (${stats.rating.toFixed(1)}⭐)\n   ${stats.count} comenzi • ${stats.revenue.toLocaleString('ro-RO')} RON\n`;
+      });
+    } else {
+      message += `_Niciun furnizor activ_\n`;
+    }
+  }
+
+  bot?.sendMessage(chatId, message, { parse_mode: 'Markdown' });
 }
 
 /**

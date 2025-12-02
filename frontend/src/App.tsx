@@ -11,6 +11,7 @@ import OrderDetailPage from './pages/OrderDetailPage';
 import ArchivePage from './pages/ArchivePage';
 import SupplierMapPage from './features/SupplierMap/SupplierMapPage';
 import AutoRejectedRFQsPage from './pages/AutoRejectedRFQsPage';
+import StatisticsPage from './pages/StatisticsPage';
 
 function App() {
   return (
@@ -94,8 +95,14 @@ function App() {
             }
           />
 
-          {/* TODO: Future feature - Statistics pages for Admin, Client, and Supplier */}
-          {/* <Route path="/statistics" element={<ProtectedRoute><StatisticsPage /></ProtectedRoute>} /> */}
+          <Route
+            path="/statistics"
+            element={
+              <ProtectedRoute>
+                <StatisticsPage />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Default redirect */}
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

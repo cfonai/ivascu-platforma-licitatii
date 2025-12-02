@@ -72,12 +72,14 @@ router.post('/', requireRole('supplier'), async (req: AuthRequest, res: Response
             id: true,
             username: true,
             email: true,
+            reputationScore: true,
           },
         },
         rfq: {
           select: {
             id: true,
             title: true,
+            budget: true,
           },
         },
       },
@@ -97,6 +99,24 @@ router.post('/', requireRole('supplier'), async (req: AuthRequest, res: Response
       const gatekeeperEnabled = process.env.GATEKEEPER_ENABLED === 'true';
 
       if (adminChatId && gatekeeperEnabled) {
+        // Calculate supplier stats for smart notification
+        const completedOrders = await prisma.order.count({
+          where: {
+            supplierId: req.user!.userId,
+            status: { in: ['finalized', 'archived'] },
+          },
+        });
+
+        const onTimeDeliveries = await prisma.order.count({
+          where: {
+            supplierId: req.user!.userId,
+            status: { in: ['finalized', 'archived'] },
+            deliveryStatus: 'received',
+          },
+        });
+
+        const onTimeRate = completedOrders > 0 ? (onTimeDeliveries / completedOrders) * 100 : 0;
+
         await sendNewSupplierOfferNotification(adminChatId, {
           offerId: offer.id,
           rfqTitle: offer.rfq.title,
@@ -104,6 +124,10 @@ router.post('/', requireRole('supplier'), async (req: AuthRequest, res: Response
           price: offer.price,
           deliveryTime: offer.deliveryTime,
           description: offer.description,
+          budget: offer.rfq.budget,
+          supplierReputation: offer.supplier.reputationScore || undefined,
+          supplierCompletedOrders: completedOrders,
+          supplierOnTimeRate: onTimeRate,
         });
         console.log(`📱 Telegram notification sent for new offer: ${offer.id}`);
       }

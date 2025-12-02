@@ -238,7 +238,7 @@ function escapeMarkdown(text: string): string {
 }
 
 /**
- * Mesaj pentru ofertă nouă de la furnizor
+ * Mesaj pentru ofertă nouă de la furnizor - ENHANCED cu Smart Context
  */
 export function createNewSupplierOfferMessage(data: {
   offerId: string;
@@ -247,17 +247,95 @@ export function createNewSupplierOfferMessage(data: {
   price: number;
   deliveryTime: string;
   description: string;
+  budget?: number;
+  supplierReputation?: number;
+  supplierCompletedOrders?: number;
+  supplierOnTimeRate?: number;
 }): string {
-  const descriptionPreview = data.description.substring(0, 200) + (data.description.length > 200 ? '...' : '');
+  const descriptionPreview = data.description.substring(0, 150) + (data.description.length > 150 ? '...' : '');
 
-  return `💼 **Ofertă Nouă de la Furnizor**
+  // Calculate budget comparison
+  let budgetComparison = '';
+  let dealQuality = '📊';
+  let aiRecommendation = '';
+  let specialReasons: string[] = [];
+
+  if (data.budget) {
+    const difference = data.budget - data.price;
+    const percentage = ((difference / data.budget) * 100).toFixed(1);
+
+    if (difference > 0) {
+      budgetComparison = `💰 **Preț:** ${data.price.toLocaleString('ro-RO')} RON (${percentage}% sub buget ✅)\n`;
+      dealQuality = '💎';
+      specialReasons.push(`${percentage}% sub bugetul alocat`);
+
+      if (parseFloat(percentage) > 10) {
+        aiRecommendation = '95% - RECOMAND ACCEPT';
+        specialReasons.push('Economie semnificativă față de buget');
+      } else {
+        aiRecommendation = '85% - Ofertă Bună';
+      }
+    } else if (difference < 0) {
+      const overBudget = Math.abs(difference);
+      const overPercentage = ((overBudget / data.budget) * 100).toFixed(1);
+      budgetComparison = `💰 **Preț:** ${data.price.toLocaleString('ro-RO')} RON (⚠️ +${overPercentage}% peste buget)\n`;
+      dealQuality = '⚠️';
+      aiRecommendation = '60% - Evalueză cu atenție';
+      specialReasons.push(`Peste buget cu ${overPercentage}%`);
+    } else {
+      budgetComparison = `💰 **Preț:** ${data.price.toLocaleString('ro-RO')} RON (exact pe buget)\n`;
+      dealQuality = '✅';
+      aiRecommendation = '80% - Acceptabil';
+    }
+  } else {
+    budgetComparison = `💰 **Preț:** ${data.price.toLocaleString('ro-RO')} RON\n`;
+  }
+
+  // Supplier quality assessment
+  let supplierBadge = '';
+  let supplierQuality = '';
+
+  if (data.supplierReputation && data.supplierReputation >= 4.5) {
+    supplierBadge = '⭐';
+    supplierQuality = `${data.supplierReputation.toFixed(1)}★ PREMIUM`;
+    specialReasons.push(`Furnizor premium cu ${data.supplierReputation.toFixed(1)}★ rating`);
+  } else if (data.supplierReputation && data.supplierReputation >= 4.0) {
+    supplierBadge = '⭐';
+    supplierQuality = `${data.supplierReputation.toFixed(1)}★`;
+  } else if (data.supplierReputation) {
+    supplierQuality = `${data.supplierReputation.toFixed(1)}★`;
+  }
+
+  // Supplier track record
+  if (data.supplierCompletedOrders && data.supplierCompletedOrders >= 5 && data.supplierOnTimeRate && data.supplierOnTimeRate >= 95) {
+    specialReasons.push(`Livrat perfect ultimele ${data.supplierCompletedOrders} comenzi`);
+  }
+
+  // Delivery time assessment
+  const deliveryDays = parseInt(data.deliveryTime);
+  if (!isNaN(deliveryDays) && deliveryDays <= 10) {
+    specialReasons.push(`Livrare rapidă: ${data.deliveryTime}`);
+  }
+
+  // Build special section
+  let specialSection = '';
+  if (specialReasons.length > 0) {
+    specialSection = `\n🎯 **De Ce E Special:**\n${specialReasons.map(r => `• ${r}`).join('\n')}\n`;
+  }
+
+  // AI recommendation section
+  let aiSection = '';
+  if (aiRecommendation) {
+    aiSection = `\n🤖 **Încredere AI:** ${aiRecommendation}\n`;
+  }
+
+  return `${dealQuality} **Ofertă Nouă${dealQuality === '💎' ? ' - OPORTUNITATE EXCELENTĂ' : dealQuality === '⚠️' ? ' - NECESITĂ EVALUARE' : ''}**
 
 📋 **RFQ:** ${escapeMarkdown(data.rfqTitle)}
-👤 **Furnizor:** ${escapeMarkdown(data.supplierName)}
-💰 **Preț Oferit:** ${data.price.toLocaleString('ro-RO')} RON
-🚚 **Termen Livrare:** ${escapeMarkdown(data.deliveryTime)}
-
-**Descriere Ofertă:**
+👤 **Furnizor:** ${escapeMarkdown(data.supplierName)} ${supplierBadge} ${supplierQuality}
+${budgetComparison}🚚 **Livrare:** ${escapeMarkdown(data.deliveryTime)}
+${specialSection}${aiSection}
+📄 **Descriere:**
 ${escapeMarkdown(descriptionPreview)}
 
 ---
