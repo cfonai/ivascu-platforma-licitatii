@@ -24,7 +24,6 @@ const allowedOrigins = (process.env.FRONTEND_URLS || 'http://localhost:5173').sp
 
 app.use(cors({
   origin: function(origin, callback) {
-    // permite cereri fără origin (ex. Postman sau server-to-server)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -34,6 +33,7 @@ app.use(cors({
   },
   credentials: true,
 }));
+
 
 // --- Middleware ---
 app.use(express.json());

@@ -5,13 +5,25 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+export const useApi = () => {
+  const { user } = useAuth();
+
+  const api = axios.create({
+    baseURL: API_URL,
+    headers: user?.token ? { Authorization: `Bearer ${user.token}` } : {},
+    withCredentials: true, // true doar dacă folosești cookie-uri
+  });
+
+  return api;
+};
+
 interface Client {
   id: string;
   username: string;
   companyName?: string;
   reputationScore?: number;
   financialScore?: number;
-  email: string;
+  email?: string;
 }
 
 interface RFQ {
@@ -36,24 +48,40 @@ export default function AutoRejectedRFQsPage() {
   const [selectedRFQ, setSelectedRFQ] = useState<RFQ | null>(null);
   const [processing, setProcessing] = useState(false);
 
+  const api = useApi();
+
+  useEffect(() => {
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const response = await api.get('/api/poc/gatekeeper/auto-rejected');
+      setRfqs(response.data.rfqs);
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Eroare la încărcare');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []); // [] = doar la mount, nu la fiecare render
+
+
   const handleLogout = async () => {
     await logout();
     navigate('/login');
   };
 
-  useEffect(() => {
-    fetchAutoRejectedRFQs();
-  }, []);
-
   const fetchAutoRejectedRFQs = async () => {
+    setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/api/poc/gatekeeper/auto-rejected`, {
-        withCredentials: true,
-      });
+      const response = await api.get('/api/poc/gatekeeper/auto-rejected');
       setRfqs(response.data.rfqs);
+      setError('');
     } catch (err: any) {
+      console.error(err);
       setError(err.response?.data?.error || 'Eroare la încărcare');
-      console.error('Eroare:', err);
     } finally {
       setLoading(false);
     }
@@ -64,13 +92,9 @@ export default function AutoRejectedRFQsPage() {
 
     setProcessing(true);
     try {
-      await axios.post(
-        `${API_URL}/api/poc/gatekeeper/re-evaluate/${rfqId}`,
-        {},
-        { withCredentials: true }
-      );
+      await api.post(`/api/poc/gatekeeper/re-evaluate/${rfqId}`);
       alert('✅ RFQ re-evaluat și publicat cu succes!');
-      fetchAutoRejectedRFQs(); // Reîncarcă lista
+      fetchAutoRejectedRFQs();
       setSelectedRFQ(null);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Eroare la re-evaluare');
@@ -84,11 +108,9 @@ export default function AutoRejectedRFQsPage() {
 
     setProcessing(true);
     try {
-      await axios.delete(`${API_URL}/api/poc/gatekeeper/delete-rejected/${rfqId}`, {
-        withCredentials: true,
-      });
+      await api.delete(`/api/poc/gatekeeper/delete-rejected/${rfqId}`);
       alert('✅ RFQ șters cu succes!');
-      fetchAutoRejectedRFQs(); // Reîncarcă lista
+      fetchAutoRejectedRFQs();
       setSelectedRFQ(null);
     } catch (err: any) {
       alert(err.response?.data?.error || 'Eroare la ștergere');
@@ -101,8 +123,7 @@ export default function AutoRejectedRFQsPage() {
     const rfqDate = new Date(date);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - rfqDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   if (loading) {
@@ -200,164 +221,164 @@ export default function AutoRejectedRFQsPage() {
           )}
         </div>
 
-      {error && (
-        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {error}
+          </div>
+        )}
 
-      {rfqs.length === 0 ? (
-        <div className="text-center py-12 bg-gray-50 rounded-lg">
-          <div className="text-6xl mb-4">✅</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Niciun RFQ respins</h3>
-          <p className="text-gray-600">Nu există RFQ-uri respinse automat în acest moment.</p>
-        </div>
-      ) : (
-        <div className="grid gap-6">
-          {rfqs.map((rfq) => {
-            const daysOld = getDaysOld(rfq.autoProcessedAt || rfq.createdAt);
-            const willDeleteIn = 7 - daysOld;
+        {rfqs.length === 0 ? (
+          <div className="text-center py-12 bg-gray-50 rounded-lg">
+            <div className="text-6xl mb-4">✅</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Niciun RFQ respins</h3>
+            <p className="text-gray-600">Nu există RFQ-uri respinse automat în acest moment.</p>
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {rfqs.map((rfq) => {
+              const daysOld = getDaysOld(rfq.autoProcessedAt || rfq.createdAt);
+              const willDeleteIn = 7 - daysOld;
 
-            return (
-              <div
-                key={rfq.id}
-                className="bg-white border-2 border-red-200 rounded-lg shadow-sm hover:shadow-md transition-shadow"
-              >
-                <div className="p-6">
-                  {/* Header */}
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">{rfq.title}</h3>
-                      <div className="flex flex-wrap gap-3 text-sm">
-                        <span className="text-gray-600">
-                          🏢 {rfq.client.companyName || rfq.client.username}
-                        </span>
-                        {rfq.client.reputationScore && (
-                          <span className="text-orange-600">
-                            ⭐ {rfq.client.reputationScore.toFixed(1)}★
+              return (
+                <div
+                  key={rfq.id}
+                  className="bg-white border-2 border-red-200 rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                >
+                  <div className="p-6">
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-2">{rfq.title}</h3>
+                        <div className="flex flex-wrap gap-3 text-sm">
+                          <span className="text-gray-600">
+                            🏢 {rfq.client.companyName || rfq.client.username}
                           </span>
-                        )}
-                        {rfq.client.financialScore && (
-                          <span className="text-blue-600">
-                            📊 Scor: {rfq.client.financialScore}/100
-                          </span>
-                        )}
-                        {rfq.budget && (
-                          <span className="text-green-600">
-                            💰 {rfq.budget.toLocaleString('ro-RO')} RON
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="inline-block px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-                        ❌ Respins Automat
-                      </span>
-                      {willDeleteIn > 0 ? (
-                        <p className="mt-2 text-xs text-gray-500">
-                          🗑️ Se șterge în {willDeleteIn} zile
-                        </p>
-                      ) : (
-                        <p className="mt-2 text-xs text-red-600 font-medium">
-                          🗑️ Va fi șters curând
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* AI Decision Reason */}
-                  {rfq.aiDecisionReason && (
-                    <div className="mb-4 bg-gray-50 border border-gray-200 rounded p-4">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-2">🤖 Motivul AI:</h4>
-                      <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                        {rfq.aiDecisionReason.split('\n\n')[0]}
-                      </p>
-                      {rfq.aiConfidenceScore && (
-                        <p className="mt-2 text-xs text-gray-500">
-                          Încredere: {rfq.aiConfidenceScore.toFixed(0)}%
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Description preview */}
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{rfq.description}</p>
-
-                  {/* Actions */}
-                  <div className="flex gap-3 pt-4 border-t">
-                    <button
-                      onClick={() => setSelectedRFQ(selectedRFQ?.id === rfq.id ? null : rfq)}
-                      className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition"
-                    >
-                      {selectedRFQ?.id === rfq.id ? '▲ Ascunde Detalii' : '▼ Vezi Detalii'}
-                    </button>
-                    <button
-                      onClick={() => handleReEvaluate(rfq.id)}
-                      disabled={processing}
-                      className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded transition disabled:opacity-50"
-                    >
-                      ✅ Re-evaluează și Publică
-                    </button>
-                    <button
-                      onClick={() => handleDelete(rfq.id)}
-                      disabled={processing}
-                      className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition disabled:opacity-50"
-                    >
-                      🗑️ Șterge Definitiv
-                    </button>
-                  </div>
-
-                  {/* Expanded Details */}
-                  {selectedRFQ?.id === rfq.id && (
-                    <div className="mt-4 pt-4 border-t space-y-3">
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-1">Descriere:</h4>
-                        <p className="text-gray-600 text-sm">{rfq.description}</p>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-gray-700 mb-1">Detalii Client:</h4>
-                        <ul className="text-sm text-gray-600 space-y-1">
-                          <li>📧 Email: {rfq.client.email}</li>
-                          <li>👤 Username: {rfq.client.username}</li>
-                          {rfq.client.companyName && <li>🏢 Companie: {rfq.client.companyName}</li>}
-                        </ul>
-                      </div>
-                      {rfq.aiDecisionReason && (
-                        <div>
-                          <h4 className="font-semibold text-gray-700 mb-1">Decizie Completă AI:</h4>
-                          <pre className="text-xs text-gray-600 bg-gray-50 p-3 rounded whitespace-pre-wrap font-mono">
-                            {rfq.aiDecisionReason}
-                          </pre>
+                          {rfq.client.reputationScore && (
+                            <span className="text-orange-600">
+                              ⭐ {rfq.client.reputationScore.toFixed(1)}★
+                            </span>
+                          )}
+                          {rfq.client.financialScore && (
+                            <span className="text-blue-600">
+                              📊 Scor: {rfq.client.financialScore}/100
+                            </span>
+                          )}
+                          {rfq.budget && (
+                            <span className="text-green-600">
+                              💰 {rfq.budget.toLocaleString('ro-RO')} RON
+                            </span>
+                          )}
                         </div>
-                      )}
-                      <div className="text-xs text-gray-500 pt-2">
-                        <p>📅 Creat: {new Date(rfq.createdAt).toLocaleString('ro-RO')}</p>
-                        {rfq.autoProcessedAt && (
-                          <p>🤖 Procesat: {new Date(rfq.autoProcessedAt).toLocaleString('ro-RO')}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-block px-3 py-1 bg-red-100 text-red-800 rounded-full text-sm font-medium">
+                          ❌ Respins Automat
+                        </span>
+                        {willDeleteIn > 0 ? (
+                          <p className="mt-2 text-xs text-gray-500">
+                            🗑️ Se șterge în {willDeleteIn} zile
+                          </p>
+                        ) : (
+                          <p className="mt-2 text-xs text-red-600 font-medium">
+                            🗑️ Va fi șters curând
+                          </p>
                         )}
-                        <p>📆 Deadline: {new Date(rfq.deadline).toLocaleDateString('ro-RO')}</p>
                       </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
 
-      {/* Summary */}
-      {rfqs.length > 0 && (
-        <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-900 mb-2">📊 Rezumat</h3>
-          <p className="text-sm text-blue-800">
-            Total RFQ-uri respinse: <strong>{rfqs.length}</strong>
-          </p>
-          <p className="text-xs text-blue-700 mt-2">
-            💡 RFQ-urile respinse automat sunt șterse complet după 7 zile pentru a păstra baza de date curată.
-          </p>
-        </div>
-      )}
+                    {/* AI Decision Reason */}
+                    {rfq.aiDecisionReason && (
+                      <div className="mb-4 bg-gray-50 border border-gray-200 rounded p-4">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-2">🤖 Motivul AI:</h4>
+                        <p className="text-sm text-gray-600 whitespace-pre-wrap">
+                          {rfq.aiDecisionReason.split('\n\n')[0]}
+                        </p>
+                        {rfq.aiConfidenceScore && (
+                          <p className="mt-2 text-xs text-gray-500">
+                            Încredere: {rfq.aiConfidenceScore.toFixed(0)}%
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Description preview */}
+                    <p className="text-gray-600 text-sm mb-4 line-clamp-2">{rfq.description}</p>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-4 border-t">
+                      <button
+                        onClick={() => setSelectedRFQ(selectedRFQ?.id === rfq.id ? null : rfq)}
+                        className="px-4 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded transition"
+                      >
+                        {selectedRFQ?.id === rfq.id ? '▲ Ascunde Detalii' : '▼ Vezi Detalii'}
+                      </button>
+                      <button
+                        onClick={() => handleReEvaluate(rfq.id)}
+                        disabled={processing}
+                        className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded transition disabled:opacity-50"
+                      >
+                        ✅ Re-evaluează și Publică
+                      </button>
+                      <button
+                        onClick={() => handleDelete(rfq.id)}
+                        disabled={processing}
+                        className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded transition disabled:opacity-50"
+                      >
+                        🗑️ Șterge Definitiv
+                      </button>
+                    </div>
+
+                    {/* Expanded Details */}
+                    {selectedRFQ?.id === rfq.id && (
+                      <div className="mt-4 pt-4 border-t space-y-3">
+                        <div>
+                          <h4 className="font-semibold text-gray-700 mb-1">Descriere:</h4>
+                          <p className="text-gray-600 text-sm">{rfq.description}</p>
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-700 mb-1">Detalii Client:</h4>
+                          <ul className="text-sm text-gray-600 space-y-1">
+                            <li>📧 Email: {rfq.client.email}</li>
+                            <li>👤 Username: {rfq.client.username}</li>
+                            {rfq.client.companyName && <li>🏢 Companie: {rfq.client.companyName}</li>}
+                          </ul>
+                        </div>
+                        {rfq.aiDecisionReason && (
+                          <div>
+                            <h4 className="font-semibold text-gray-700 mb-1">Decizie Completă AI:</h4>
+                            <pre className="text-xs text-gray-600 bg-gray-50 p-3 rounded whitespace-pre-wrap font-mono">
+                              {rfq.aiDecisionReason}
+                            </pre>
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500 pt-2">
+                          <p>📅 Creat: {new Date(rfq.createdAt).toLocaleString('ro-RO')}</p>
+                          {rfq.autoProcessedAt && (
+                            <p>🤖 Procesat: {new Date(rfq.autoProcessedAt).toLocaleString('ro-RO')}</p>
+                          )}
+                          <p>📆 Deadline: {new Date(rfq.deadline).toLocaleDateString('ro-RO')}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Summary */}
+        {rfqs.length > 0 && (
+          <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h3 className="font-semibold text-blue-900 mb-2">📊 Rezumat</h3>
+            <p className="text-sm text-blue-800">
+              Total RFQ-uri respinse: <strong>{rfqs.length}</strong>
+            </p>
+            <p className="text-xs text-blue-700 mt-2">
+              💡 RFQ-urile respinse automat sunt șterse complet după 7 zile pentru a păstra baza de date curată.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );
