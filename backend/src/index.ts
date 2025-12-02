@@ -19,15 +19,27 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// --- CORS Middleware ---
+const allowedOrigins = (process.env.FRONTEND_URLS || 'http://localhost:5173').split(',');
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: function(origin, callback) {
+    // permite cereri fără origin (ex. Postman sau server-to-server)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('Blocked by CORS:', origin);
+      callback(new Error('CORS blocked'));
+    }
+  },
   credentials: true,
 }));
+
+// --- Middleware ---
 app.use(express.json());
 app.use(cookieParser());
 
-// Health check endpoint
+// --- Health check endpoint ---
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -36,7 +48,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Welcome endpoint
+// --- Welcome endpoint ---
 app.get('/api', (req, res) => {
   res.json({
     message: 'Platformă Licitații - API',
@@ -54,7 +66,7 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Routes
+// --- Routes ---
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/rfqs', rfqRoutes);
@@ -63,14 +75,14 @@ app.use('/api/negotiations', negotiationRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/statistics', statisticsRoutes);
 
-// POC: Gatekeeper Routes
+// --- POC: Gatekeeper Routes ---
 app.use('/api/poc/gatekeeper', gatekeeperRoutes);
 
-// Start server
+// --- Start server ---
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 CORS enabled for: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+  console.log(`🌐 CORS enabled for: ${allowedOrigins.join(', ')}`);
 
   // POC: Start Gatekeeper Service (doar dacă Telegram este configurat)
   if (process.env.GATEKEEPER_ENABLED === 'true') {
